@@ -1,0 +1,165 @@
+# warden-sandbox-infra
+
+This repo is the infrastructure layer for running Warden workflows in E2B
+sandboxes.
+
+The Warden app repo is the source of truth for product logic and workflow
+contracts:
+
+```text
+relative: ../warden
+absolute: /Users/jie/Codes/warden
+opened parent: /Users/jie/Codes/warden-org
+```
+
+`/Users/jie/Codes/warden-org/warden` is a symlink to the real Warden repo at
+`/Users/jie/Codes/warden`.
+
+## Index
+
+- `/Users/jie/Codes/warden-org/` - opened parent workspace containing the
+  Warden app symlink and this infra repo.
+- `AGENTS.md` and `CLAUDE.md` - mirrored repo handbooks for Codex and Claude
+  Code; keep these files identical.
+- `README.md` - human-facing repo summary.
+- `../warden/AGENTS.md` - Warden app rules.
+- `../warden/CLAUDE.md` - Warden app handbook.
+- `../warden/.claude/rules/` - Warden app implementation rules.
+
+## Instruction Files
+
+- `AGENTS.md` and `CLAUDE.md` must stay byte-for-byte equivalent in this repo
+  so Codex and Claude Code receive the same repo context.
+- `../warden/AGENTS.md` and `../warden/CLAUDE.md` belong to the Warden app.
+  Read them for app contracts and context; do not copy Warden business rules
+  into this infra repo.
+
+## Responsibility Split
+
+This repo owns infrastructure:
+
+- finding claimable Warden tasks;
+- claiming a task with `worker_id` and `lease_expires_at`;
+- starting an E2B sandbox for the claimed task;
+- passing task-scoped environment variables into the sandbox;
+- renewing the task lease while sandbox work runs;
+- observing sandbox completion/failure;
+- keeping infrastructure tests separate from Warden business tests.
+
+The Warden app repo owns business behavior:
+
+- workflow steps and wrappers;
+- content strategy and publishing rules;
+- Supabase schema migrations;
+- task status semantics;
+- workflow progress and snapshots;
+- artifact paths and storage semantics;
+- dashboard behavior.
+
+The integration boundary is:
+
+```text
+task_id + Supabase API contract
+```
+
+Infra should not import Warden source files at runtime. If it needs Warden
+behavior, run Warden code inside the sandbox through a clearly configured worker
+command.
+
+## Warden Context To Read
+
+For queue and lease work:
+
+- `../warden/src/data_model/db.ts`
+- `../warden/src/data_model/types.ts`
+- `../warden/src/runner.ts`
+- `../warden/supabase/migrations/`
+- `../warden/docs/plans/2026-06-15-supabase-db-simplification-for-e2b.md`
+
+For artifact and storage work:
+
+- `../warden/docs/plans/2026-06-15-e2b-artifact-storage-migration.md`
+- `../warden/.claude/rules/data-flow.md`
+- `../warden/.claude/rules/pipeline-flow.md`
+
+For dashboard/user-visible workflow state:
+
+- `../warden/.claude/rules/data-flow.md`
+- `../warden/landing/CLAUDE.md`
+- `../warden/landing/app/lib/types.ts`
+
+## Expected Runtime Model
+
+```text
+warden-sandbox-infra controller
+  -> polls Supabase for claimable warden_tasks
+  -> claims one task with worker_id + lease_expires_at
+  -> starts E2B sandbox
+  -> passes WARDEN_TASK_ID and WARDEN_WORKER_ID
+  -> runs the configured Warden worker command
+  -> renews lease until completion/failure
+
+Warden worker command inside sandbox
+  -> reads WARDEN_TASK_ID
+  -> runs Warden business logic
+  -> writes task status/progress/snapshots to Supabase
+```
+
+## Working With Both Repos
+
+Start Codex from the repo you want to change:
+
+```bash
+cd /Users/jie/Codes/warden-org/warden-sandbox-infra
+codex
+```
+
+When Warden context is needed, read it by relative path:
+
+```bash
+sed -n '1,220p' ../warden/AGENTS.md
+sed -n '1,220p' ../warden/src/data_model/db.ts
+```
+
+Check Git state separately:
+
+```bash
+git status --short
+git -C ../warden status --short
+```
+
+Do not make one commit that mixes files from both repos unless the user
+explicitly asks for a cross-repo change.
+
+## Design Rules
+
+- Prefer Supabase as the source of truth for task state.
+- Treat E2B sandboxes as temporary execution environments.
+- Keep worker identity explicit through `WARDEN_WORKER_ID`.
+- Keep task ownership explicit through `worker_id` and `lease_expires_at`.
+- Renew leases while a sandbox is doing work.
+- Assume sandbox local files are temporary unless a Warden storage design says
+  otherwise.
+- Keep business workflow decisions in Warden, not in this infra repo.
+- Do not over-engineer; prefer the simplest deterministic design that satisfies
+  the current requirement and matches existing repo patterns.
+
+## Environment
+
+Do not commit real secrets. Expected runtime variables will include:
+
+```text
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+E2B_API_KEY
+WARDEN_WORKER_COMMAND
+WARDEN_WORKER_ID
+```
+
+Use `.env.example` for placeholders only if this repo later adds one.
+
+## Verification
+
+When this repo has code, prefer focused tests first, then a full build/test run.
+If a change depends on Warden's task contract, verify against the relevant
+Warden types/migrations before committing.
