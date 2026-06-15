@@ -137,6 +137,11 @@ git -C ../warden status --short
 Do not make one commit that mixes files from both repos unless the user
 explicitly asks for a cross-repo change.
 
+When the user says "commit, push" without naming a branch, commit the current
+repo changes to a `progress` branch and push `origin progress`. Do not push
+directly to `main` unless the user explicitly asks. This lets the user review
+the diff in GitHub Desktop before merging to `main`.
+
 ## Design Rules
 
 - Prefer Supabase as the source of truth for task state.
