@@ -1,3 +1,6 @@
 # Local AI assistant scratch directories
 .claude/
 .codex/
+
+# Local planning notes
+docs/plans/
