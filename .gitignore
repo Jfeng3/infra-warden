@@ -4,3 +4,17 @@
 
 # Local planning notes
 docs/plans/
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Build output
+build/
+dist/
+*.egg-info/
