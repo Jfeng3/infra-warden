@@ -158,8 +158,11 @@ Do not commit real secrets. Expected runtime variables will include:
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
 E2B_API_KEY
+E2B_TEMPLATE
 WARDEN_WORKER_COMMAND
 WARDEN_WORKER_ID
+WARDEN_SANDBOX_RUNTIME
+WARDEN_SANDBOX_ENV
 ```
 
 Use `.env.example` for placeholders only if this repo later adds one.
@@ -170,10 +173,17 @@ Use `.env.example` for placeholders only if this repo later adds one.
 - Claiming, leases, timeouts, and failures are deterministic and testable.
 - Secrets are read from environment/config, never hardcoded.
 - Infra changes include focused tests once the test harness exists.
+- `make check` passes.
 - Docs are updated when repo contracts or runtime behavior change.
 
 ## Verification
 
-When this repo has code, prefer focused tests first, then a full build/test run.
-If a change depends on Warden's task contract, verify against the relevant
-Warden types/migrations before committing.
+Run:
+
+```bash
+make check
+```
+
+This compiles Python source and runs the focused async unit tests. If a change
+depends on Warden's task contract, verify against the relevant Warden
+types/migrations before committing.
