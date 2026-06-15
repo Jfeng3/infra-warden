@@ -34,6 +34,12 @@ opened parent: /Users/jie/Codes/warden-org
   Read them for app contracts and context; do not copy Warden business rules
   into this infra repo.
 
+## Project Goal
+
+Claim a Warden task from Supabase, run it in an isolated E2B sandbox, keep its
+lease alive, and report success or failure. Warden business logic stays in the
+Warden app repo.
+
 ## Responsibility Split
 
 This repo owns infrastructure:
@@ -157,6 +163,14 @@ WARDEN_WORKER_ID
 ```
 
 Use `.env.example` for placeholders only if this repo later adds one.
+
+## Definition of Done
+
+- Warden business logic stays out of this repo.
+- Claiming, leases, timeouts, and failures are deterministic and testable.
+- Secrets are read from environment/config, never hardcoded.
+- Infra changes include focused tests once the test harness exists.
+- Docs are updated when repo contracts or runtime behavior change.
 
 ## Verification
 
