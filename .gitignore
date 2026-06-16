@@ -1,6 +1,22 @@
 # Local AI assistant scratch directories
 .claude/
 .codex/
+.agents/
 
 # Local planning notes
 docs/plans/
+docs/interviews/
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Build output
+build/
+dist/
+*.egg-info/
