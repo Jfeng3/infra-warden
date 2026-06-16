@@ -5,6 +5,7 @@
 
 # Local planning notes
 docs/plans/
+docs/interviews/
 
 # Python caches and local environments
 __pycache__/
