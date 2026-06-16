@@ -6,7 +6,7 @@ import unittest
 
 from warden_sandbox_infra.config import ControllerConfig
 from warden_sandbox_infra.controller import SandboxController
-from warden_sandbox_infra.models import SandboxRunResult, Task
+from warden_sandbox_infra.models import SandboxRunResult, TaskLease
 from warden_sandbox_infra.supabase_store import LeaseLostError
 
 
@@ -30,14 +30,14 @@ def config() -> ControllerConfig:
 
 @dataclass
 class FakeStore:
-    task: Task | None
+    task: TaskLease | None
     renew_ok: bool = True
     claimed: list[str] = field(default_factory=list)
     renewed: int = 0
     completed: list[tuple[str, str, str]] = field(default_factory=list)
     failed: list[tuple[str, str, str]] = field(default_factory=list)
 
-    async def poll_claimable_task(self) -> Task | None:
+    async def poll_claimable_task(self) -> TaskLease | None:
         return self.task
 
     async def claim_task(self, task_id: str, worker_id: str, lease_ttl_seconds: int) -> bool:
@@ -89,7 +89,7 @@ class FakeRuntime:
 
 class ControllerTests(unittest.IsolatedAsyncioTestCase):
     async def test_run_once_completes_claimed_task(self) -> None:
-        store = FakeStore(Task(id="task-1", instruction="run", status="pending"))
+        store = FakeStore(TaskLease(id="task-1", status="pending"))
         runtime = FakeRuntime(SandboxRunResult(exit_code=0, stdout="done"))
         controller = SandboxController(config(), store, runtime)
 
@@ -101,7 +101,7 @@ class ControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(runtime.env_seen["WARDEN_TASK_ID"], "task-1")
 
     async def test_run_once_fails_on_nonzero_exit(self) -> None:
-        store = FakeStore(Task(id="task-1", instruction="run", status="pending"))
+        store = FakeStore(TaskLease(id="task-1", status="pending"))
         runtime = FakeRuntime(SandboxRunResult(exit_code=2, stderr="bad"))
         controller = SandboxController(config(), store, runtime)
 
@@ -123,7 +123,7 @@ class ControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(store.claimed, [])
 
     async def test_lost_lease_cancels_runtime_without_terminal_write(self) -> None:
-        store = FakeStore(Task(id="task-1", instruction="run", status="pending"), renew_ok=False)
+        store = FakeStore(TaskLease(id="task-1", status="pending"), renew_ok=False)
         runtime = FakeRuntime(SandboxRunResult(exit_code=0), delay_seconds=1)
         controller = SandboxController(config(), store, runtime)
 

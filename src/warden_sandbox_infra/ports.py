@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from .models import SandboxRunResult, Task
+from .models import SandboxRunResult, TaskLease
 
 
 class TaskStore(Protocol):
-    async def poll_claimable_task(self) -> Task | None: ...
+    async def poll_claimable_task(self) -> TaskLease | None: ...
 
     async def claim_task(self, task_id: str, worker_id: str, lease_ttl_seconds: int) -> bool: ...
 
