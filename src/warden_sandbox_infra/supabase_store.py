@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from .models import Task
+from .models import TASK_LEASE_SELECT, TaskLease
 
 
 class SupabaseError(RuntimeError):
@@ -37,21 +37,21 @@ class SupabaseTaskStore:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def poll_claimable_task(self) -> Task | None:
+    async def poll_claimable_task(self) -> TaskLease | None:
         pending = await self._select_one(
             {
-                "select": "*",
+                "select": TASK_LEASE_SELECT,
                 "status": "eq.pending",
                 "order": "created_at.asc",
                 "limit": "1",
             }
         )
         if pending:
-            return Task.from_row(pending)
+            return TaskLease.from_row(pending)
 
         legacy_running = await self._select_one(
             {
-                "select": "*",
+                "select": TASK_LEASE_SELECT,
                 "status": "eq.running",
                 "lease_expires_at": "is.null",
                 "order": "started_at.asc",
@@ -59,18 +59,18 @@ class SupabaseTaskStore:
             }
         )
         if legacy_running:
-            return Task.from_row(legacy_running)
+            return TaskLease.from_row(legacy_running)
 
         expired_running = await self._select_one(
             {
-                "select": "*",
+                "select": TASK_LEASE_SELECT,
                 "status": "eq.running",
                 "lease_expires_at": f"lt.{_now_iso()}",
                 "order": "lease_expires_at.asc",
                 "limit": "1",
             }
         )
-        return Task.from_row(expired_running) if expired_running else None
+        return TaskLease.from_row(expired_running) if expired_running else None
 
     async def claim_task(self, task_id: str, worker_id: str, lease_ttl_seconds: int) -> bool:
         now = _now_iso()
