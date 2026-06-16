@@ -7,6 +7,11 @@
 docs/plans/
 docs/interviews/
 
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
 # Python caches and local environments
 __pycache__/
 *.py[cod]
