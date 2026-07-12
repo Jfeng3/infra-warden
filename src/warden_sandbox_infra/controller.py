@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .config import ControllerConfig
-from .models import SandboxRunResult
+from .models import SandboxRunResult, TaskLease
 from .ports import SandboxRuntime, TaskStore
 from .supabase_store import LeaseLostError
 
@@ -28,9 +28,17 @@ class SandboxController:
         self.runtime = runtime
 
     async def run_once(self) -> RunOnceResult:
-        task = await self.store.poll_claimable_task()
+        task = await self.store.poll_claimable_task(self.config.worker_id)
         if task is None:
             return RunOnceResult(status="idle")
+
+        return await self._run_task(task)
+
+    async def run_task(self, task_id: str) -> RunOnceResult:
+        """Claim and execute one explicit task without polling another queue item."""
+        return await self._run_task(TaskLease(id=task_id, status="pending"))
+
+    async def _run_task(self, task: TaskLease) -> RunOnceResult:
 
         claimed = await self.store.claim_task(
             task.id,

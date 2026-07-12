@@ -19,7 +19,7 @@ class TaskContractTests(unittest.IsolatedAsyncioTestCase):
     async def test_poll_claimable_task_uses_infra_task_column_whitelist(self) -> None:
         store = RecordingSupabaseTaskStore("https://example.supabase.co", "secret")
 
-        result = await store.poll_claimable_task()
+        result = await store.poll_claimable_task("e2b-controller-1")
 
         self.assertIsNone(result)
         self.assertEqual(len(store.select_params), 3)
@@ -29,6 +29,7 @@ class TaskContractTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("metadata", params["select"])
             self.assertNotIn("workflow_progress", params["select"])
             self.assertNotIn("instruction", params["select"])
+            self.assertEqual(params["metadata->>target_worker_id"], "eq.e2b-controller-1")
 
     def test_task_lease_does_not_expose_app_owned_fields(self) -> None:
         task = TaskLease.from_row(

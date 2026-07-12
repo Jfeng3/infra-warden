@@ -37,13 +37,15 @@ class SupabaseTaskStore:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def poll_claimable_task(self) -> TaskLease | None:
+    async def poll_claimable_task(self, worker_id: str | None = None) -> TaskLease | None:
+        target_filter = {"metadata->>target_worker_id": f"eq.{worker_id}"} if worker_id else {}
         pending = await self._select_one(
             {
                 "select": TASK_LEASE_SELECT,
                 "status": "eq.pending",
                 "order": "created_at.asc",
                 "limit": "1",
+                **target_filter,
             }
         )
         if pending:
@@ -56,6 +58,7 @@ class SupabaseTaskStore:
                 "lease_expires_at": "is.null",
                 "order": "started_at.asc",
                 "limit": "1",
+                **target_filter,
             }
         )
         if legacy_running:
@@ -68,6 +71,7 @@ class SupabaseTaskStore:
                 "lease_expires_at": f"lt.{_now_iso()}",
                 "order": "lease_expires_at.asc",
                 "limit": "1",
+                **target_filter,
             }
         )
         return TaskLease.from_row(expired_running) if expired_running else None

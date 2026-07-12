@@ -37,7 +37,8 @@ class FakeStore:
     completed: list[tuple[str, str, str]] = field(default_factory=list)
     failed: list[tuple[str, str, str]] = field(default_factory=list)
 
-    async def poll_claimable_task(self) -> TaskLease | None:
+    async def poll_claimable_task(self, worker_id: str | None = None) -> TaskLease | None:
+        del worker_id
         return self.task
 
     async def claim_task(self, task_id: str, worker_id: str, lease_ttl_seconds: int) -> bool:
@@ -88,6 +89,18 @@ class FakeRuntime:
 
 
 class ControllerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_run_task_claims_only_the_explicit_task_id(self) -> None:
+        store = FakeStore(TaskLease(id="older-task", status="pending"))
+        runtime = FakeRuntime(SandboxRunResult(exit_code=0, stdout="done"))
+        controller = SandboxController(config(), store, runtime)
+
+        result = await controller.run_task("target-task")
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.task_id, "target-task")
+        self.assertEqual(store.claimed, ["target-task:worker-1"])
+        self.assertEqual(runtime.env_seen["WARDEN_TASK_ID"], "target-task")
+
     async def test_run_once_completes_claimed_task(self) -> None:
         store = FakeStore(TaskLease(id="task-1", status="pending"))
         runtime = FakeRuntime(SandboxRunResult(exit_code=0, stdout="done"))
