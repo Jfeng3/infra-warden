@@ -88,8 +88,11 @@ WARDEN_SANDBOX_ENV=SUPABASE_URL,SUPABASE_ANON_KEY,OPENROUTER_API_KEY,DEFAULT_PRO
 ```
 
 The default `openai-codex` provider expects local Codex authentication, which is
-not baked into the template. Do not copy `~/.codex/auth.json` into an image;
-configure a sandbox-suitable provider credential instead.
+not baked into the template. For each task, the controller reads
+`WARDEN_CODEX_AUTH_PATH` (default `~/.codex/auth.json`), uploads it to the
+disposable sandbox as `/home/user/.codex/auth.json` with mode `600`, and destroys
+it with the sandbox. Set `WARDEN_CODEX_AUTH_PATH=` to disable this behavior and
+use an API-key provider instead.
 
 Use `WARDEN_SANDBOX_RUNTIME=local` for local command execution during
 development.

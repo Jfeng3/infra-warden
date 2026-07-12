@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from contextlib import suppress
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .models import SandboxRunResult
@@ -56,6 +58,7 @@ class LocalCommandRuntime:
 class E2BSandboxRuntime:
     template: str
     sandbox_timeout_seconds: int
+    codex_auth_path: str | None = None
 
     async def run_task(
         self,
@@ -67,6 +70,7 @@ class E2BSandboxRuntime:
         task_id: str,
         worker_id: str,
     ) -> SandboxRunResult:
+        codex_auth = _read_codex_auth(self.codex_auth_path) if self.codex_auth_path else None
         try:
             from e2b import AsyncSandbox
         except ImportError as exc:
@@ -80,6 +84,8 @@ class E2BSandboxRuntime:
         )
         sandbox_id = _sandbox_id(sandbox)
         try:
+            if codex_auth is not None:
+                await _upload_codex_auth(sandbox, codex_auth)
             result = await sandbox.commands.run(
                 command,
                 cwd=cwd,
@@ -106,6 +112,34 @@ class E2BSandboxRuntime:
         finally:
             with suppress(Exception):
                 await sandbox.kill()
+
+
+def _read_codex_auth(path: str) -> bytes:
+    auth_path = Path(path)
+    try:
+        data = auth_path.read_bytes()
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"Codex auth file not found: {auth_path}") from exc
+    try:
+        parsed = json.loads(data)
+        tokens = parsed["tokens"]
+        if not tokens.get("access_token") or not tokens.get("refresh_token"):
+            raise ValueError("missing OAuth tokens")
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        raise RuntimeError(f"Codex auth file is invalid: {auth_path}") from exc
+    return data
+
+
+async def _upload_codex_auth(sandbox: Any, data: bytes) -> None:
+    directory = "/home/user/.codex"
+    destination = f"{directory}/auth.json"
+    await sandbox.files.make_dir(directory, user="user")
+    await sandbox.files.write(destination, data, user="user")
+    await sandbox.commands.run(
+        f"chmod 700 {directory} && chmod 600 {destination}",
+        user="user",
+        timeout=30,
+    )
 
 
 async def _kill_process(process: asyncio.subprocess.Process) -> None:

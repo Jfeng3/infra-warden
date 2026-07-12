@@ -108,4 +108,5 @@ def _build_runtime(config):
     return E2BSandboxRuntime(
         template=config.e2b_template,
         sandbox_timeout_seconds=config.sandbox_timeout_seconds,
+        codex_auth_path=config.codex_auth_path,
     )

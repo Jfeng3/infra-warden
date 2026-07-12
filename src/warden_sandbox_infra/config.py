@@ -27,6 +27,7 @@ class ControllerConfig:
     sandbox_timeout_seconds: int
     command_timeout_seconds: int
     forwarded_env_names: tuple[str, ...]
+    codex_auth_path: str | None = None
 
     def worker_env(self, task_id: str, source_env: Mapping[str, str] = os.environ) -> dict[str, str]:
         env = {
@@ -61,6 +62,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> ControllerConfig:
         for item in env.get("WARDEN_SANDBOX_ENV", ",".join(DEFAULT_FORWARDED_ENV)).split(",")
         if item.strip()
     )
+    codex_auth_raw = env.get("WARDEN_CODEX_AUTH_PATH", "~/.codex/auth.json").strip()
 
     return ControllerConfig(
         supabase_url=supabase_url,
@@ -76,6 +78,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> ControllerConfig:
         sandbox_timeout_seconds=_int_env(env, "WARDEN_SANDBOX_TIMEOUT_SECONDS", DEFAULT_SANDBOX_TIMEOUT_SECONDS),
         command_timeout_seconds=_int_env(env, "WARDEN_COMMAND_TIMEOUT_SECONDS", 0),
         forwarded_env_names=forwarded_env,
+        codex_auth_path=os.path.expanduser(codex_auth_raw) if runtime == "e2b" and codex_auth_raw else None,
     )
 
 

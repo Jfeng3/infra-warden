@@ -29,10 +29,25 @@ class FakeCommands:
         return self.result
 
 
+class FakeFiles:
+    def __init__(self) -> None:
+        self.make_dir_calls: list[dict[str, object]] = []
+        self.write_calls: list[dict[str, object]] = []
+
+    async def make_dir(self, path: str, **kwargs: object) -> bool:
+        self.make_dir_calls.append({"path": path, **kwargs})
+        return True
+
+    async def write(self, path: str, data: bytes, **kwargs: object) -> object:
+        self.write_calls.append({"path": path, "data": data, **kwargs})
+        return object()
+
+
 class FakeSandbox:
     def __init__(self, result: FakeCommandResult | Exception) -> None:
         self.sandbox_id = "sandbox-123"
         self.commands = FakeCommands(result)
+        self.files = FakeFiles()
         self.killed = False
 
     async def kill(self) -> None:
@@ -109,6 +124,47 @@ class E2BRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.exit_code, 17)
         self.assertEqual(result.stderr, "worker crashed")
         self.assertEqual(result.error, "command connection failed")
+        self.assertTrue(FakeAsyncSandbox.sandbox.killed)
+
+    async def test_uploads_codex_auth_with_private_permissions(self) -> None:
+        auth = b'{"tokens":{"access_token":"access","refresh_token":"refresh"}}'
+        runtime = E2BSandboxRuntime(
+            template="warden:v1",
+            sandbox_timeout_seconds=600,
+            codex_auth_path="/secure/auth.json",
+        )
+
+        with (
+            patch("warden_sandbox_infra.runtimes.Path.read_bytes", return_value=auth),
+            patch.dict(sys.modules, {"e2b": SimpleNamespace(AsyncSandbox=FakeAsyncSandbox)}),
+        ):
+            result = await runtime.run_task(
+                command="npm run warden -- worker-task",
+                env={"WARDEN_TASK_ID": "task-1"},
+                cwd="/workspace/warden",
+                timeout_seconds=300,
+                task_id="task-1",
+                worker_id="worker-1",
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(
+            FakeAsyncSandbox.sandbox.files.make_dir_calls,
+            [{"path": "/home/user/.codex", "user": "user"}],
+        )
+        self.assertEqual(
+            FakeAsyncSandbox.sandbox.files.write_calls,
+            [{"path": "/home/user/.codex/auth.json", "data": auth, "user": "user"}],
+        )
+        self.assertEqual(
+            FakeAsyncSandbox.sandbox.commands.calls[0],
+            {
+                "command": "chmod 700 /home/user/.codex && chmod 600 /home/user/.codex/auth.json",
+                "user": "user",
+                "timeout": 30,
+            },
+        )
+        self.assertNotIn("CODEX_AUTH", FakeAsyncSandbox.create_calls[0]["envs"])
         self.assertTrue(FakeAsyncSandbox.sandbox.killed)
 
 
