@@ -83,9 +83,34 @@ class SandboxController:
         return RunOnceResult(status="failed", task_id=task.id, message=message)
 
     async def run_forever(self) -> None:
-        while True:
-            await self.run_once()
-            await asyncio.sleep(self.config.poll_interval_seconds)
+        active: dict[str, asyncio.Task[RunOnceResult]] = {}
+        try:
+            while True:
+                finished = [task_id for task_id, run in active.items() if run.done()]
+                for task_id in finished:
+                    run = active.pop(task_id)
+                    run.result()
+
+                while len(active) < self.config.max_concurrent_tasks:
+                    task = await self.store.poll_claimable_task(self.config.worker_id)
+                    if task is None or task.id in active:
+                        break
+                    active[task.id] = asyncio.create_task(self._run_task(task))
+                    # Let the task claim its lease before polling for another row.
+                    await asyncio.sleep(0)
+
+                if active:
+                    await asyncio.wait(
+                        active.values(),
+                        timeout=self.config.poll_interval_seconds,
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                else:
+                    await asyncio.sleep(self.config.poll_interval_seconds)
+        finally:
+            for run in active.values():
+                run.cancel()
+            await asyncio.gather(*active.values(), return_exceptions=True)
 
     async def _fail_if_owned(self, task_id: str, message: str) -> None:
         with suppress(LeaseLostError):

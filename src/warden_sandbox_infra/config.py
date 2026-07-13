@@ -27,6 +27,7 @@ class ControllerConfig:
     sandbox_timeout_seconds: int
     command_timeout_seconds: int
     forwarded_env_names: tuple[str, ...]
+    max_concurrent_tasks: int = 4
     codex_auth_path: str | None = None
 
     def worker_env(self, task_id: str, source_env: Mapping[str, str] = os.environ) -> dict[str, str]:
@@ -79,6 +80,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> ControllerConfig:
         sandbox_timeout_seconds=_int_env(env, "WARDEN_SANDBOX_TIMEOUT_SECONDS", DEFAULT_SANDBOX_TIMEOUT_SECONDS),
         command_timeout_seconds=_int_env(env, "WARDEN_COMMAND_TIMEOUT_SECONDS", 0),
         forwarded_env_names=forwarded_env,
+        max_concurrent_tasks=max(1, _int_env(env, "WARDEN_MAX_CONCURRENT_TASKS", 4)),
         codex_auth_path=os.path.expanduser(codex_auth_raw) if runtime == "e2b" and codex_auth_raw else None,
     )
 

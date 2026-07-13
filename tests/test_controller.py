@@ -88,6 +88,39 @@ class FakeRuntime:
             raise
 
 
+@dataclass
+class QueueStore(FakeStore):
+    tasks: list[TaskLease] = field(default_factory=list)
+
+    async def poll_claimable_task(self, worker_id: str | None = None) -> TaskLease | None:
+        del worker_id
+        return self.tasks.pop(0) if self.tasks else None
+
+
+@dataclass
+class BlockingRuntime:
+    expected_starts: int
+    started_task_ids: list[str] = field(default_factory=list)
+    all_started: asyncio.Event = field(default_factory=asyncio.Event)
+
+    async def run_task(
+        self,
+        *,
+        command: str,
+        env: dict[str, str],
+        cwd: str | None,
+        timeout_seconds: int,
+        task_id: str,
+        worker_id: str,
+    ) -> SandboxRunResult:
+        del command, env, cwd, timeout_seconds, worker_id
+        self.started_task_ids.append(task_id)
+        if len(self.started_task_ids) >= self.expected_starts:
+            self.all_started.set()
+        await asyncio.Event().wait()
+        return SandboxRunResult(exit_code=0)
+
+
 class ControllerTests(unittest.IsolatedAsyncioTestCase):
     async def test_run_task_claims_only_the_explicit_task_id(self) -> None:
         store = FakeStore(TaskLease(id="older-task", status="pending"))
@@ -146,6 +179,24 @@ class ControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(runtime.cancelled)
         self.assertEqual(store.completed, [])
         self.assertEqual(store.failed, [])
+
+    async def test_run_forever_starts_multiple_tasks_concurrently(self) -> None:
+        store = QueueStore(
+            task=None,
+            tasks=[TaskLease(id=f"task-{index}", status="pending") for index in range(1, 5)],
+        )
+        runtime = BlockingRuntime(expected_starts=4)
+        controller = SandboxController(config(), store, runtime)
+        controller_task = asyncio.create_task(controller.run_forever())
+
+        try:
+            await asyncio.wait_for(runtime.all_started.wait(), timeout=1)
+            self.assertEqual(runtime.started_task_ids, ["task-1", "task-2", "task-3", "task-4"])
+            self.assertEqual(len(store.claimed), 4)
+        finally:
+            controller_task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await controller_task
 
 
 if __name__ == "__main__":
