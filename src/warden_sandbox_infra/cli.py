@@ -109,4 +109,6 @@ def _build_runtime(config):
         template=config.e2b_template,
         sandbox_timeout_seconds=config.sandbox_timeout_seconds,
         codex_auth_path=config.codex_auth_path,
+        vercel_auth_path=config.vercel_auth_path,
+        vercel_project_path=config.vercel_project_path,
     )

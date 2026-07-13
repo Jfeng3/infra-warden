@@ -5,7 +5,8 @@ import json
 import os
 from contextlib import suppress
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from shlex import quote
 from typing import Any
 
 from .models import SandboxRunResult
@@ -59,6 +60,8 @@ class E2BSandboxRuntime:
     template: str
     sandbox_timeout_seconds: int
     codex_auth_path: str | None = None
+    vercel_auth_path: str | None = None
+    vercel_project_path: str | None = None
 
     async def run_task(
         self,
@@ -71,6 +74,8 @@ class E2BSandboxRuntime:
         worker_id: str,
     ) -> SandboxRunResult:
         codex_auth = _read_codex_auth(self.codex_auth_path) if self.codex_auth_path else None
+        vercel_auth = _read_vercel_auth(self.vercel_auth_path) if self.vercel_auth_path else None
+        vercel_project = _read_vercel_project(self.vercel_project_path) if self.vercel_project_path else None
         try:
             from e2b import AsyncSandbox
         except ImportError as exc:
@@ -86,6 +91,10 @@ class E2BSandboxRuntime:
         try:
             if codex_auth is not None:
                 await _upload_codex_auth(sandbox, codex_auth)
+            if vercel_auth is not None:
+                await _upload_vercel_auth(sandbox, vercel_auth)
+            if vercel_project is not None:
+                await _upload_vercel_project(sandbox, vercel_project, cwd)
             result = await sandbox.commands.run(
                 command,
                 cwd=cwd,
@@ -130,6 +139,36 @@ def _read_codex_auth(path: str) -> bytes:
     return data
 
 
+def _read_vercel_auth(path: str) -> bytes:
+    data, parsed, auth_path = _read_json_file(path, "Vercel auth")
+    if not isinstance(parsed.get("token"), str) or not parsed["token"].strip():
+        raise RuntimeError(f"Vercel auth file is invalid: {auth_path}")
+    return data
+
+
+def _read_vercel_project(path: str) -> bytes:
+    data, parsed, project_path = _read_json_file(path, "Vercel project")
+    required = ("orgId", "projectId")
+    if any(not isinstance(parsed.get(key), str) or not parsed[key].strip() for key in required):
+        raise RuntimeError(f"Vercel project file is invalid: {project_path}")
+    return data
+
+
+def _read_json_file(path: str, label: str) -> tuple[bytes, dict[str, Any], Path]:
+    file_path = Path(path)
+    try:
+        data = file_path.read_bytes()
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"{label} file not found: {file_path}") from exc
+    try:
+        parsed = json.loads(data)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{label} file is invalid: {file_path}") from exc
+    if not isinstance(parsed, dict):
+        raise RuntimeError(f"{label} file is invalid: {file_path}")
+    return data, parsed, file_path
+
+
 async def _upload_codex_auth(sandbox: Any, data: bytes) -> None:
     directory = "/home/user/.codex"
     destination = f"{directory}/auth.json"
@@ -137,6 +176,31 @@ async def _upload_codex_auth(sandbox: Any, data: bytes) -> None:
     await sandbox.files.write(destination, data, user="user")
     await sandbox.commands.run(
         f"chmod 700 {directory} && chmod 600 {destination}",
+        user="user",
+        timeout=30,
+    )
+
+
+async def _upload_vercel_auth(sandbox: Any, data: bytes) -> None:
+    directory = "/home/user/.local/share/com.vercel.cli"
+    destination = f"{directory}/auth.json"
+    await sandbox.files.make_dir(directory, user="user")
+    await sandbox.files.write(destination, data, user="user")
+    await sandbox.commands.run(
+        f"chmod 700 {quote(directory)} && chmod 600 {quote(destination)}",
+        user="user",
+        timeout=30,
+    )
+
+
+async def _upload_vercel_project(sandbox: Any, data: bytes, cwd: str | None) -> None:
+    repo_root = PurePosixPath(cwd or "/workspace/warden")
+    directory = str(repo_root / ".vercel")
+    destination = f"{directory}/project.json"
+    await sandbox.files.make_dir(directory, user="user")
+    await sandbox.files.write(destination, data, user="user")
+    await sandbox.commands.run(
+        f"chmod 700 {quote(directory)} && chmod 600 {quote(destination)}",
         user="user",
         timeout=30,
     )

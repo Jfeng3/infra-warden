@@ -31,7 +31,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(env["SUPABASE_SERVICE_ROLE_KEY"], "secret")
         self.assertNotIn("MISSING", env)
 
-    def test_e2b_config_expands_codex_auth_path(self) -> None:
+    def test_e2b_config_expands_task_auth_paths(self) -> None:
         config = load_config(
             {
                 "SUPABASE_URL": "https://example.supabase.co",
@@ -39,10 +39,29 @@ class ConfigTests(unittest.TestCase):
                 "WARDEN_WORKER_COMMAND": "warden worker-task",
                 "WARDEN_SANDBOX_RUNTIME": "e2b",
                 "WARDEN_CODEX_AUTH_PATH": "/secure/codex-auth.json",
+                "WARDEN_VERCEL_AUTH_PATH": "/secure/vercel-auth.json",
+                "WARDEN_VERCEL_PROJECT_PATH": "/secure/vercel-project.json",
             }
         )
 
         self.assertEqual(config.codex_auth_path, "/secure/codex-auth.json")
+        self.assertEqual(config.vercel_auth_path, "/secure/vercel-auth.json")
+        self.assertEqual(config.vercel_project_path, "/secure/vercel-project.json")
+
+    def test_empty_vercel_paths_disable_injection(self) -> None:
+        config = load_config(
+            {
+                "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_SERVICE_ROLE_KEY": "secret",
+                "WARDEN_WORKER_COMMAND": "warden worker-task",
+                "WARDEN_SANDBOX_RUNTIME": "e2b",
+                "WARDEN_VERCEL_AUTH_PATH": "",
+                "WARDEN_VERCEL_PROJECT_PATH": "",
+            }
+        )
+
+        self.assertIsNone(config.vercel_auth_path)
+        self.assertIsNone(config.vercel_project_path)
 
     def test_required_supabase_credentials_are_forwarded_even_with_custom_env_list(self) -> None:
         config = load_config(

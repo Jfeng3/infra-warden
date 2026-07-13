@@ -103,5 +103,13 @@ disposable sandbox as `/home/user/.codex/auth.json` with mode `600`, and destroy
 it with the sandbox. Set `WARDEN_CODEX_AUTH_PATH=` to disable this behavior and
 use an API-key provider instead.
 
+Preview publishing uses the same task-scoped pattern for Vercel. When present,
+the controller auto-detects the host Vercel CLI auth file and the sibling Warden
+project link at `../warden/.vercel/project.json`, validates both JSON contracts,
+then uploads them as private files to the disposable sandbox. Override discovery
+with `WARDEN_VERCEL_AUTH_PATH` and `WARDEN_VERCEL_PROJECT_PATH`, or set either
+variable to an empty value to disable that file. Vercel credentials are never
+baked into the E2B template or added to the task environment.
+
 Use `WARDEN_SANDBOX_RUNTIME=local` for local command execution during
 development.

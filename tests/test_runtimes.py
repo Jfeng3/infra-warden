@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -165,6 +167,78 @@ class E2BRuntimeTests(unittest.IsolatedAsyncioTestCase):
             },
         )
         self.assertNotIn("CODEX_AUTH", FakeAsyncSandbox.create_calls[0]["envs"])
+        self.assertTrue(FakeAsyncSandbox.sandbox.killed)
+
+    async def test_uploads_vercel_auth_and_project_with_private_permissions(self) -> None:
+        auth = b'{"token":"vercel-token"}'
+        project = b'{"orgId":"team-1","projectId":"project-1","projectName":"inkwarden"}'
+        with TemporaryDirectory() as temp_dir:
+            auth_path = Path(temp_dir) / "auth.json"
+            project_path = Path(temp_dir) / "project.json"
+            auth_path.write_bytes(auth)
+            project_path.write_bytes(project)
+            runtime = E2BSandboxRuntime(
+                template="warden:v1",
+                sandbox_timeout_seconds=600,
+                vercel_auth_path=str(auth_path),
+                vercel_project_path=str(project_path),
+            )
+
+            with patch.dict(sys.modules, {"e2b": SimpleNamespace(AsyncSandbox=FakeAsyncSandbox)}):
+                result = await runtime.run_task(
+                    command="npm run warden -- worker-task",
+                    env={"WARDEN_TASK_ID": "task-1"},
+                    cwd="/workspace/warden",
+                    timeout_seconds=300,
+                    task_id="task-1",
+                    worker_id="worker-1",
+                )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(
+            FakeAsyncSandbox.sandbox.files.make_dir_calls,
+            [
+                {"path": "/home/user/.local/share/com.vercel.cli", "user": "user"},
+                {"path": "/workspace/warden/.vercel", "user": "user"},
+            ],
+        )
+        self.assertEqual(
+            FakeAsyncSandbox.sandbox.files.write_calls,
+            [
+                {
+                    "path": "/home/user/.local/share/com.vercel.cli/auth.json",
+                    "data": auth,
+                    "user": "user",
+                },
+                {
+                    "path": "/workspace/warden/.vercel/project.json",
+                    "data": project,
+                    "user": "user",
+                },
+            ],
+        )
+        self.assertEqual(
+            FakeAsyncSandbox.sandbox.commands.calls[:2],
+            [
+                {
+                    "command": (
+                        "chmod 700 /home/user/.local/share/com.vercel.cli "
+                        "&& chmod 600 /home/user/.local/share/com.vercel.cli/auth.json"
+                    ),
+                    "user": "user",
+                    "timeout": 30,
+                },
+                {
+                    "command": (
+                        "chmod 700 /workspace/warden/.vercel "
+                        "&& chmod 600 /workspace/warden/.vercel/project.json"
+                    ),
+                    "user": "user",
+                    "timeout": 30,
+                },
+            ],
+        )
+        self.assertNotIn("VERCEL_TOKEN", FakeAsyncSandbox.create_calls[0]["envs"])
         self.assertTrue(FakeAsyncSandbox.sandbox.killed)
 
 

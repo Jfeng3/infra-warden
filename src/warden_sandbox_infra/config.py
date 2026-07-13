@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+from pathlib import Path
 import socket
 from typing import Mapping
 
@@ -10,6 +11,8 @@ DEFAULT_LEASE_TTL_SECONDS = 10 * 60
 DEFAULT_POLL_INTERVAL_SECONDS = 2.0
 DEFAULT_SANDBOX_TIMEOUT_SECONDS = 60 * 60
 DEFAULT_FORWARDED_ENV = ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY")
+INFRA_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_VERCEL_PROJECT_PATH = INFRA_ROOT.parent / "warden" / ".vercel" / "project.json"
 
 
 @dataclass(frozen=True)
@@ -29,6 +32,8 @@ class ControllerConfig:
     forwarded_env_names: tuple[str, ...]
     max_concurrent_tasks: int = 20
     codex_auth_path: str | None = None
+    vercel_auth_path: str | None = None
+    vercel_project_path: str | None = None
 
     def worker_env(self, task_id: str, source_env: Mapping[str, str] = os.environ) -> dict[str, str]:
         env = {
@@ -65,6 +70,16 @@ def load_config(env: Mapping[str, str] = os.environ) -> ControllerConfig:
     )
     forwarded_env = tuple(dict.fromkeys((*DEFAULT_FORWARDED_ENV, *configured_forwarded_env)))
     codex_auth_raw = env.get("WARDEN_CODEX_AUTH_PATH", "~/.codex/auth.json").strip()
+    vercel_auth_path = _optional_file_setting(
+        env,
+        "WARDEN_VERCEL_AUTH_PATH",
+        _detected_vercel_auth_path(env),
+    )
+    vercel_project_path = _optional_file_setting(
+        env,
+        "WARDEN_VERCEL_PROJECT_PATH",
+        DEFAULT_VERCEL_PROJECT_PATH,
+    )
 
     return ControllerConfig(
         supabase_url=supabase_url,
@@ -82,7 +97,32 @@ def load_config(env: Mapping[str, str] = os.environ) -> ControllerConfig:
         forwarded_env_names=forwarded_env,
         max_concurrent_tasks=max(1, _int_env(env, "WARDEN_MAX_CONCURRENT_TASKS", 20)),
         codex_auth_path=os.path.expanduser(codex_auth_raw) if runtime == "e2b" and codex_auth_raw else None,
+        vercel_auth_path=vercel_auth_path if runtime == "e2b" else None,
+        vercel_project_path=vercel_project_path if runtime == "e2b" else None,
     )
+
+
+def _detected_vercel_auth_path(env: Mapping[str, str]) -> Path | None:
+    home = Path(env.get("HOME") or Path.home())
+    xdg_data_home = Path(env.get("XDG_DATA_HOME") or home / ".local" / "share")
+    candidates = (
+        home / "Library" / "Application Support" / "com.vercel.cli" / "auth.json",
+        xdg_data_home / "com.vercel.cli" / "auth.json",
+    )
+    return next((path for path in candidates if path.is_file()), None)
+
+
+def _optional_file_setting(
+    env: Mapping[str, str],
+    name: str,
+    detected_default: Path | None,
+) -> str | None:
+    if name in env:
+        raw = env.get(name, "").strip()
+        return os.path.expanduser(raw) if raw else None
+    if detected_default is None or not detected_default.is_file():
+        return None
+    return str(detected_default)
 
 
 def _required(env: Mapping[str, str], name: str) -> str:
