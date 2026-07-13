@@ -81,7 +81,7 @@ Continuous `run` and `run-once` only poll tasks whose
 E2B-targeted work isolated.
 
 One continuous controller can manage multiple task sandboxes concurrently.
-`WARDEN_MAX_CONCURRENT_TASKS` sets the per-controller limit and defaults to 4;
+`WARDEN_MAX_CONCURRENT_TASKS` sets the per-controller limit and defaults to 20;
 each active task keeps its own lease and E2B sandbox lifecycle.
 
 Forward only credentials the selected Warden provider and workflow need. For
