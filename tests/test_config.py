@@ -44,6 +44,22 @@ class ConfigTests(unittest.TestCase):
 
         self.assertEqual(config.codex_auth_path, "/secure/codex-auth.json")
 
+    def test_required_supabase_credentials_are_forwarded_even_with_custom_env_list(self) -> None:
+        config = load_config(
+            {
+                "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_SERVICE_ROLE_KEY": "secret",
+                "WARDEN_WORKER_COMMAND": "warden worker-task",
+                "WARDEN_SANDBOX_RUNTIME": "e2b",
+                "WARDEN_SANDBOX_ENV": "POSTHOG_API_KEY",
+            }
+        )
+
+        self.assertEqual(
+            config.forwarded_env_names,
+            ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "POSTHOG_API_KEY"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -84,8 +84,13 @@ Forward only credentials the selected Warden provider and workflow need. For
 example, an OpenRouter-backed worker may use:
 
 ```bash
-WARDEN_SANDBOX_ENV=SUPABASE_URL,SUPABASE_ANON_KEY,OPENROUTER_API_KEY,DEFAULT_PROVIDER,DEFAULT_MODEL
+WARDEN_SANDBOX_ENV=OPENROUTER_API_KEY,DEFAULT_PROVIDER,DEFAULT_MODEL
 ```
+
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are always
+forwarded to the task sandbox. `WARDEN_SANDBOX_ENV` adds optional runtime names;
+it cannot remove those core credentials. The service-role key is required for
+the private `workflow-artifacts` bucket and must never be exposed to browser code.
 
 The default `openai-codex` provider expects local Codex authentication, which is
 not baked into the template. For each task, the controller reads

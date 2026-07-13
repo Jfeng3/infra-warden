@@ -57,11 +57,12 @@ def load_config(env: Mapping[str, str] = os.environ) -> ControllerConfig:
     renew_default = min(120.0, max(30.0, lease_ttl / 4))
     renew_interval = _float_env(env, "WARDEN_LEASE_RENEW_INTERVAL_SECONDS", renew_default)
 
-    forwarded_env = tuple(
+    configured_forwarded_env = tuple(
         item.strip()
         for item in env.get("WARDEN_SANDBOX_ENV", ",".join(DEFAULT_FORWARDED_ENV)).split(",")
         if item.strip()
     )
+    forwarded_env = tuple(dict.fromkeys((*DEFAULT_FORWARDED_ENV, *configured_forwarded_env)))
     codex_auth_raw = env.get("WARDEN_CODEX_AUTH_PATH", "~/.codex/auth.json").strip()
 
     return ControllerConfig(
