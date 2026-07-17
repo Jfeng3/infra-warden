@@ -116,7 +116,7 @@ Warden worker command inside sandbox
 Start Codex from the repo you want to change:
 
 ```bash
-cd /Users/jie/Codes/warden-org/warden-sandbox-infra
+cd /Users/jie/Codes/warden-org/infra
 codex
 ```
 
