@@ -64,7 +64,20 @@ the sandbox must execute exactly `WARDEN_TASK_ID` as the existing
 
 Warden exposes `worker-task --task-id`, which validates that the task is
 `running` and owned by `WARDEN_WORKER_ID`, then directly executes it without
-polling. Run one task with:
+polling. For targeted/manual work, use the fixed launcher:
+
+```bash
+make run-task TASK_ID=<task-id>
+```
+
+The launcher reads controller settings from this repo's `.env`, reads only the
+reviewed Warden runtime variables from `../warden/.env`, and sets the canonical
+`WARDEN_SANDBOX_ENV` list. It validates Supabase, E2B, PostHog, and the selected
+LLM provider before paying to create a sandbox. It also replaces any inherited
+`WARDEN_WORKER_COMMAND` with the canonical command, preventing nested shell
+quotes from reaching E2B. It never prints secret values.
+
+The equivalent low-level controller invocation is:
 
 ```bash
 WARDEN_SANDBOX_RUNTIME=e2b \
@@ -95,6 +108,13 @@ WARDEN_SANDBOX_ENV=OPENROUTER_API_KEY,DEFAULT_PROVIDER,DEFAULT_MODEL
 forwarded to the task sandbox. `WARDEN_SANDBOX_ENV` adds optional runtime names;
 it cannot remove those core credentials. The service-role key is required for
 the private `workflow-artifacts` bucket and must never be exposed to browser code.
+Direct low-level invocations must maintain this list themselves; use
+`make run-task` for the reviewed full Warden workflow whitelist.
+
+If a startup failure already marked a task `failed`, create a new Warden task
+and pass its new ID to `make run-task`. A failed row is terminal and is not a
+retry target. Do not add outer quotes around the complete worker command; the
+launcher owns the exact command value.
 
 The default `openai-codex` provider expects local Codex authentication, which is
 not baked into the template. For each task, the controller reads

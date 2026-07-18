@@ -196,3 +196,22 @@ make check
 This compiles Python source and runs the focused async unit tests. If a change
 depends on Warden's task contract, verify against the relevant Warden
 types/migrations before committing.
+
+## Running A Targeted Warden Task
+
+Always use the fixed launcher for a real targeted E2B task:
+
+```bash
+make run-task TASK_ID=<task-id>
+```
+
+Do not assemble an ad hoc `WARDEN_SANDBOX_ENV` list or retry a task once per
+missing variable. `scripts/run_warden_task.py` loads controller settings from
+this repo's `.env`, loads only its reviewed Warden runtime whitelist from
+`../warden/.env`, and validates required E2B, Supabase, PostHog, and provider
+settings before creating the sandbox. It always replaces inherited
+`WARDEN_WORKER_COMMAND` with its canonical command; never wrap that complete
+command in another quote layer. If a startup failure has already marked a task
+`failed`, create a new Warden task and invoke the launcher with the new task ID;
+do not try to reuse the terminal failed row. Update the script whitelist, tests,
+and docs together when Warden adds a new sandbox runtime credential.

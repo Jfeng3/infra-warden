@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
+import shlex
 import socket
 from typing import Mapping
 
@@ -55,6 +56,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> ControllerConfig:
 
     worker_id = env.get("WARDEN_WORKER_ID") or f"local:{socket.gethostname()}:{os.getpid()}"
     worker_command = _required(env, "WARDEN_WORKER_COMMAND")
+    _validate_shell_quoting(worker_command)
     runtime = env.get("WARDEN_SANDBOX_RUNTIME", "e2b").strip().lower()
     if runtime not in {"e2b", "local"}:
         raise ValueError("WARDEN_SANDBOX_RUNTIME must be 'e2b' or 'local'")
@@ -130,6 +132,13 @@ def _required(env: Mapping[str, str], name: str) -> str:
     if not value:
         raise ValueError(f"{name} must be set")
     return value
+
+
+def _validate_shell_quoting(command: str) -> None:
+    try:
+        shlex.split(command, posix=True)
+    except ValueError as exc:
+        raise ValueError(f"WARDEN_WORKER_COMMAND has invalid shell quoting: {exc}") from exc
 
 
 def _int_env(env: Mapping[str, str], name: str, default: int) -> int:

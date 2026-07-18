@@ -6,6 +6,17 @@ from warden_sandbox_infra.config import load_config
 
 
 class ConfigTests(unittest.TestCase):
+    def test_rejects_unbalanced_worker_command_quotes_before_runtime(self) -> None:
+        with self.assertRaisesRegex(ValueError, "WARDEN_WORKER_COMMAND has invalid shell quoting"):
+            load_config(
+                {
+                    "SUPABASE_URL": "https://example.supabase.co",
+                    "SUPABASE_SERVICE_ROLE_KEY": "secret",
+                    "WARDEN_WORKER_COMMAND": "npm run warden -- worker-task --task-id '$WARDEN_TASK_ID",
+                    "WARDEN_SANDBOX_RUNTIME": "e2b",
+                }
+            )
+
     def test_worker_env_is_task_scoped(self) -> None:
         config = load_config(
             {
