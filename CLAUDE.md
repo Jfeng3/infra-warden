@@ -146,6 +146,8 @@ the diff in GitHub Desktop before merging to `main`.
 
 - Prefer Supabase as the source of truth for task state.
 - Treat E2B sandboxes as temporary execution environments.
+- When creating an E2B template, name it with a date prefix followed by the job
+  name: `YYYY-MM-DD-<job-name>` (for example, `2026-07-16-bmi-blog`).
 - Keep worker identity explicit through `WARDEN_WORKER_ID`.
 - Keep task ownership explicit through `worker_id` and `lease_expires_at`.
 - Renew leases while a sandbox is doing work.
