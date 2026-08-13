@@ -15,6 +15,7 @@ from e2b import Template, default_build_logger
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WARDEN_REPO = REPO_ROOT.parent / "warden"
+CLIENT_SPECIFIC_PREFIXES = ("client-delivery/", "landing/public/clients/")
 
 
 def main() -> None:
@@ -43,11 +44,13 @@ def main() -> None:
 
     with tempfile.TemporaryDirectory(prefix="warden-e2b-template-") as temp_dir:
         context = Path(temp_dir)
-        _export_tracked_source(source, context)
+        warden_context = context / "warden"
+        warden_context.mkdir()
+        _export_tracked_source(source, warden_context)
         template = (
             Template(file_context_path=context)
             .from_node_image("22")
-            .copy(".", "/workspace/warden", user="user")
+            .copy("warden/.", "/workspace/warden", user="user")
             .run_cmd("chown -R user:user /workspace/warden", user="root")
             .set_workdir("/workspace/warden")
             .run_cmd("HUSKY=0 npm ci")
@@ -63,7 +66,9 @@ def main() -> None:
             on_build_logs=default_build_logger(),
         )
 
-    print(f"built template={args.name} warden_revision={revision} build={build}")
+    print(
+        f"built template={args.name} warden_revision={revision} client_inputs=0 build={build}"
+    )
 
 
 def _require_source_files(source: Path) -> None:
@@ -75,6 +80,8 @@ def _require_source_files(source: Path) -> None:
 def _export_tracked_source(source: Path, destination: Path) -> None:
     tracked = _git(source, "ls-files", "-z").decode().split("\0")
     for relative in filter(None, tracked):
+        if relative in {"client-delivery", "landing/public/clients"} or relative.startswith(CLIENT_SPECIFIC_PREFIXES):
+            continue
         source_path = source / relative
         if not source_path.exists() and not source_path.is_symlink():
             continue

@@ -9,7 +9,7 @@ from pathlib import Path, PurePosixPath
 from shlex import quote
 from typing import Any
 
-from .models import SandboxRunResult
+from .models import SandboxRunResult, SandboxUploadBundle
 
 
 class LocalCommandRuntime:
@@ -22,8 +22,9 @@ class LocalCommandRuntime:
         timeout_seconds: int,
         task_id: str,
         worker_id: str,
+        upload_bundle: SandboxUploadBundle | None = None,
     ) -> SandboxRunResult:
-        del task_id, worker_id
+        del task_id, worker_id, upload_bundle
         process = await asyncio.create_subprocess_shell(
             command,
             cwd=cwd,
@@ -72,6 +73,7 @@ class E2BSandboxRuntime:
         timeout_seconds: int,
         task_id: str,
         worker_id: str,
+        upload_bundle: SandboxUploadBundle | None = None,
     ) -> SandboxRunResult:
         codex_auth = _read_codex_auth(self.codex_auth_path) if self.codex_auth_path else None
         vercel_auth = _read_vercel_auth(self.vercel_auth_path) if self.vercel_auth_path else None
@@ -95,6 +97,8 @@ class E2BSandboxRuntime:
                 await _upload_vercel_auth(sandbox, vercel_auth)
             if vercel_project is not None:
                 await _upload_vercel_project(sandbox, vercel_project, cwd)
+            if upload_bundle is not None:
+                await _upload_task_bundle(sandbox, upload_bundle)
             result = await sandbox.commands.run(
                 command,
                 cwd=cwd,
@@ -204,6 +208,22 @@ async def _upload_vercel_project(sandbox: Any, data: bytes, cwd: str | None) -> 
         user="user",
         timeout=30,
     )
+
+
+async def _upload_task_bundle(sandbox: Any, bundle: SandboxUploadBundle) -> None:
+    directories = sorted({str(PurePosixPath(item.destination_path).parent) for item in bundle.uploads})
+    for directory in directories:
+        await sandbox.files.make_dir(directory, user="user")
+    for item in bundle.uploads:
+        await sandbox.files.write(item.destination_path, Path(item.source_path).read_bytes(), user="user")
+    if not bundle.uploads:
+        return
+    directory_args = " ".join(quote(item) for item in directories)
+    private_files = " ".join(quote(item.destination_path) for item in bundle.uploads if item.mode == 0o600)
+    commands = [f"chmod 700 {directory_args}"] if directory_args else []
+    if private_files:
+        commands.append(f"chmod 600 {private_files}")
+    await sandbox.commands.run(" && ".join(commands), user="user", timeout=30)
 
 
 async def _kill_process(process: asyncio.subprocess.Process) -> None:

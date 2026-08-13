@@ -10,6 +10,7 @@ from .lease_keeper import LeaseKeeper
 from .models import SandboxRunResult, TaskLease
 from .ports import SandboxRuntime, TaskStore
 from .supabase_store import LeaseLostError
+from .task_inputs import prepare_sandbox_uploads
 
 
 RunStatus = Literal["idle", "not_claimed", "completed", "failed", "lost_lease"]
@@ -51,6 +52,12 @@ class SandboxController:
 
         env = self.config.worker_env(task.id)
         try:
+            sandbox_inputs = await self.store.get_task_sandbox_inputs(task.id)
+            upload_bundle = prepare_sandbox_uploads(
+                sandbox_inputs,
+                client_runtime_root=self.config.client_runtime_root,
+                private_source_roots=self.config.private_source_roots,
+            )
             async with LeaseKeeper(
                 store=self.store,
                 task_id=task.id,
@@ -65,6 +72,7 @@ class SandboxController:
                     timeout_seconds=self.config.command_timeout_seconds,
                     task_id=task.id,
                     worker_id=self.config.worker_id,
+                    upload_bundle=upload_bundle,
                 )
         except LeaseLostError as exc:
             return RunOnceResult(status="lost_lease", task_id=task.id, message=str(exc))

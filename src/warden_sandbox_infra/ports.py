@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from .models import SandboxRunResult, TaskLease
+from .models import SandboxRunResult, SandboxUploadBundle, TaskLease, TaskSandboxInputs
 
 
 class TaskStore(Protocol):
     async def poll_claimable_task(self, worker_id: str | None = None) -> TaskLease | None: ...
 
     async def claim_task(self, task_id: str, worker_id: str, lease_ttl_seconds: int) -> bool: ...
+
+    async def get_task_sandbox_inputs(self, task_id: str) -> TaskSandboxInputs | None: ...
 
     async def renew_task_lease(self, task_id: str, worker_id: str, lease_ttl_seconds: int) -> bool: ...
 
@@ -27,4 +29,5 @@ class SandboxRuntime(Protocol):
         timeout_seconds: int,
         task_id: str,
         worker_id: str,
+        upload_bundle: SandboxUploadBundle | None = None,
     ) -> SandboxRunResult: ...

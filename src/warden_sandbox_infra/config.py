@@ -14,6 +14,11 @@ DEFAULT_SANDBOX_TIMEOUT_SECONDS = 60 * 60
 DEFAULT_FORWARDED_ENV = ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY")
 INFRA_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_VERCEL_PROJECT_PATH = INFRA_ROOT.parent / "warden" / ".vercel" / "project.json"
+DEFAULT_CLIENT_RUNTIME_ROOT = INFRA_ROOT.parent / "project-delivery" / "runtime-config"
+DEFAULT_PRIVATE_SOURCE_ROOTS = (
+    INFRA_ROOT.parent / "project-delivery" / "private-inputs",
+    INFRA_ROOT.parent / "domain-niche",
+)
 
 
 @dataclass(frozen=True)
@@ -35,6 +40,8 @@ class ControllerConfig:
     codex_auth_path: str | None = None
     vercel_auth_path: str | None = None
     vercel_project_path: str | None = None
+    client_runtime_root: str | None = None
+    private_source_roots: tuple[str, ...] = ()
 
     def worker_env(self, task_id: str, source_env: Mapping[str, str] = os.environ) -> dict[str, str]:
         env = {
@@ -82,6 +89,16 @@ def load_config(env: Mapping[str, str] = os.environ) -> ControllerConfig:
         "WARDEN_VERCEL_PROJECT_PATH",
         DEFAULT_VERCEL_PROJECT_PATH,
     )
+    client_runtime_root = _optional_directory_setting(
+        env,
+        "WARDEN_CLIENT_RUNTIME_ROOT",
+        DEFAULT_CLIENT_RUNTIME_ROOT,
+    )
+    private_source_roots = _directory_list_setting(
+        env,
+        "WARDEN_PRIVATE_SOURCE_ROOTS",
+        DEFAULT_PRIVATE_SOURCE_ROOTS,
+    )
 
     return ControllerConfig(
         supabase_url=supabase_url,
@@ -101,6 +118,8 @@ def load_config(env: Mapping[str, str] = os.environ) -> ControllerConfig:
         codex_auth_path=os.path.expanduser(codex_auth_raw) if runtime == "e2b" and codex_auth_raw else None,
         vercel_auth_path=vercel_auth_path if runtime == "e2b" else None,
         vercel_project_path=vercel_project_path if runtime == "e2b" else None,
+        client_runtime_root=client_runtime_root,
+        private_source_roots=private_source_roots,
     )
 
 
@@ -125,6 +144,28 @@ def _optional_file_setting(
     if detected_default is None or not detected_default.is_file():
         return None
     return str(detected_default)
+
+
+def _optional_directory_setting(
+    env: Mapping[str, str],
+    name: str,
+    detected_default: Path,
+) -> str | None:
+    if name in env:
+        raw = env.get(name, "").strip()
+        return str(Path(os.path.expanduser(raw)).resolve()) if raw else None
+    return str(detected_default.resolve()) if detected_default.is_dir() else None
+
+
+def _directory_list_setting(
+    env: Mapping[str, str],
+    name: str,
+    defaults: tuple[Path, ...],
+) -> tuple[str, ...]:
+    if name in env:
+        raw_values = [item.strip() for item in env.get(name, "").split(os.pathsep) if item.strip()]
+        return tuple(str(Path(os.path.expanduser(item)).resolve()) for item in raw_values)
+    return tuple(str(item.resolve()) for item in defaults if item.is_dir())
 
 
 def _required(env: Mapping[str, str], name: str) -> str:

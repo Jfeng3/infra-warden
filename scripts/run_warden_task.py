@@ -11,6 +11,7 @@ import re
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WARDEN_REPO = REPO_ROOT.parent / "warden"
+DEFAULT_PROJECT_DELIVERY_REPO = REPO_ROOT.parent / "project-delivery"
 CANONICAL_WORKER_COMMAND = 'npm run warden -- worker-task --task-id "$WARDEN_TASK_ID"'
 
 # Keep this list explicit: these values cross the host/sandbox trust boundary.
@@ -100,6 +101,19 @@ def build_controller_env(
     # `/bin/bash: unexpected EOF` before Warden could execute step 0.
     env["WARDEN_WORKER_COMMAND"] = CANONICAL_WORKER_COMMAND
     env["WARDEN_SANDBOX_ENV"] = ",".join(WARDEN_RUNTIME_ENV)
+    env.setdefault(
+        "WARDEN_CLIENT_RUNTIME_ROOT",
+        str(DEFAULT_PROJECT_DELIVERY_REPO / "runtime-config"),
+    )
+    env.setdefault(
+        "WARDEN_PRIVATE_SOURCE_ROOTS",
+        os.pathsep.join(
+            (
+                str(DEFAULT_PROJECT_DELIVERY_REPO / "private-inputs"),
+                str(REPO_ROOT.parent / "domain-niche"),
+            )
+        ),
+    )
     return env
 
 

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from warden_sandbox_infra.models import SandboxUpload, SandboxUploadBundle
 from warden_sandbox_infra.runtimes import E2BSandboxRuntime
 
 
@@ -240,6 +241,36 @@ class E2BRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("VERCEL_TOKEN", FakeAsyncSandbox.create_calls[0]["envs"])
         self.assertTrue(FakeAsyncSandbox.sandbox.killed)
+
+    async def test_uploads_task_scoped_files_before_running_worker(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "workflow.json"
+            source.write_bytes(b'{"client":"a"}')
+            destination = f"{temp_dir}/runtime-config/client-a/workflow.json"
+            bundle = SandboxUploadBundle((SandboxUpload(str(source), destination),))
+            runtime = E2BSandboxRuntime(template="warden:v1", sandbox_timeout_seconds=600)
+
+            with patch.dict(sys.modules, {"e2b": SimpleNamespace(AsyncSandbox=FakeAsyncSandbox)}):
+                result = await runtime.run_task(
+                    command="npm run warden -- worker-task",
+                    env={"WARDEN_TASK_ID": "task-1"},
+                    cwd="/workspace/warden",
+                    timeout_seconds=300,
+                    task_id="task-1",
+                    worker_id="worker-1",
+                    upload_bundle=bundle,
+                )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(
+            FakeAsyncSandbox.sandbox.files.write_calls,
+            [{"path": destination, "data": b'{"client":"a"}', "user": "user"}],
+        )
+        self.assertIn("chmod 600", FakeAsyncSandbox.sandbox.commands.calls[0]["command"])
+        self.assertEqual(
+            FakeAsyncSandbox.sandbox.commands.calls[1]["command"],
+            "npm run warden -- worker-task",
+        )
 
 
 if __name__ == "__main__":

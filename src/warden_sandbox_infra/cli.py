@@ -15,6 +15,8 @@ DEFAULT_E2B_SMOKE_COMMAND = """set -eu
 node --version
 npm --version
 test -f /workspace/warden/package.json
+test ! -e /workspace/warden/client-delivery
+test ! -e /workspace/warden/landing/public/clients
 printf 'warden_template=ready\\n'
 """
 

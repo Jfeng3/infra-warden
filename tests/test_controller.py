@@ -46,6 +46,10 @@ class FakeStore:
         self.claimed.append(f"{task_id}:{worker_id}")
         return True
 
+    async def get_task_sandbox_inputs(self, task_id: str):
+        del task_id
+        return None
+
     async def renew_task_lease(self, task_id: str, worker_id: str, lease_ttl_seconds: int) -> bool:
         del task_id, worker_id, lease_ttl_seconds
         self.renewed += 1
@@ -76,8 +80,9 @@ class FakeRuntime:
         timeout_seconds: int,
         task_id: str,
         worker_id: str,
+        upload_bundle=None,
     ) -> SandboxRunResult:
-        del command, cwd, timeout_seconds, task_id, worker_id
+        del command, cwd, timeout_seconds, task_id, worker_id, upload_bundle
         self.env_seen = env
         try:
             if self.delay_seconds:
@@ -112,8 +117,9 @@ class BlockingRuntime:
         timeout_seconds: int,
         task_id: str,
         worker_id: str,
+        upload_bundle=None,
     ) -> SandboxRunResult:
-        del command, env, cwd, timeout_seconds, worker_id
+        del command, env, cwd, timeout_seconds, worker_id, upload_bundle
         self.started_task_ids.append(task_id)
         if len(self.started_task_ids) >= self.expected_starts:
             self.all_started.set()

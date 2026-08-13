@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from warden_sandbox_infra.models import TASK_LEASE_SELECT, TaskLease
+from warden_sandbox_infra.models import TASK_LEASE_SELECT, TASK_SANDBOX_INPUTS_SELECT, TaskLease
 from warden_sandbox_infra.supabase_store import SupabaseTaskStore
 
 
@@ -45,6 +45,17 @@ class TaskContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(hasattr(task, "instruction"))
         self.assertFalse(hasattr(task, "metadata"))
         self.assertFalse(hasattr(task, "workflow_progress"))
+
+    async def test_reads_only_the_sandbox_input_projection_after_claim(self) -> None:
+        store = RecordingSupabaseTaskStore("https://example.supabase.co", "secret")
+
+        with self.assertRaisesRegex(Exception, "Task does not exist"):
+            await store.get_task_sandbox_inputs("task-1")
+
+        self.assertEqual(
+            store.select_params,
+            [{"select": TASK_SANDBOX_INPUTS_SELECT, "id": "eq.task-1", "limit": "1"}],
+        )
 
 
 if __name__ == "__main__":

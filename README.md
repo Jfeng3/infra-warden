@@ -28,9 +28,10 @@ make check
 
 ## Make The E2B Sandbox Work
 
-Build a template from Warden's tracked working-tree files. This includes edits
+Build a client-neutral template from Warden's tracked working-tree files. This includes edits
 to tracked source files for pre-commit testing, but cannot include `.env`,
-`.git`, ignored credentials, generated artifacts, or unrelated untracked files:
+`.git`, ignored credentials, generated artifacts, unrelated untracked files,
+or anything under `client-delivery/` or `landing/public/clients/`:
 
 ```bash
 E2B_API_KEY=<key> \
@@ -55,6 +56,27 @@ The smoke command creates a disposable sandbox, checks Node, npm, and
 `/workspace/warden/package.json`, prints the sandbox ID and versions, then kills
 the sandbox. Override `WARDEN_E2B_SMOKE_COMMAND` if a template uses a different
 layout.
+
+### Build the buying-guide pipeline template
+
+The buying-guide target is a convenience name for the same client-neutral
+build. It never accepts or packages a client config, roadmap, or private source:
+
+```bash
+E2B_API_KEY=<key> make build-buying-guide-e2b-template
+```
+
+The target defaults to `2026-08-12-buying-guide-pipeline-code-only`. Override
+`BUYING_GUIDE_E2B_TEMPLATE` when creating a later dated code image.
+
+After a task is claimed, the controller reads only
+`metadata.sandbox_inputs`. It validates the selected client directory beneath
+`WARDEN_CLIENT_RUNTIME_ROOT`, uploads that one directory, and uploads only the
+selected local private source beneath `WARDEN_PRIVATE_SOURCE_ROOTS`. Files are
+mode `600`; symlinks and paths outside the allowlists fail before E2B starts.
+The defaults are sibling `project-delivery/runtime-config`,
+`project-delivery/private-inputs`, and `domain-niche`. Separate multiple private
+roots with the host path separator.
 
 ## Claimed Task Contract
 

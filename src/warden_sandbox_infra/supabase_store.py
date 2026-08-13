@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from .models import TASK_LEASE_SELECT, TaskLease
+from .models import TASK_LEASE_SELECT, TASK_SANDBOX_INPUTS_SELECT, TaskLease, TaskSandboxInputs
 
 
 class SupabaseError(RuntimeError):
@@ -122,6 +122,18 @@ class SupabaseTaskStore:
             reclaim_update,
         )
         return bool(rows)
+
+    async def get_task_sandbox_inputs(self, task_id: str) -> TaskSandboxInputs | None:
+        row = await self._select_one(
+            {
+                "select": TASK_SANDBOX_INPUTS_SELECT,
+                "id": f"eq.{task_id}",
+                "limit": "1",
+            }
+        )
+        if row is None:
+            raise SupabaseError(f"Task does not exist: {task_id}")
+        return TaskSandboxInputs.from_value(row.get("sandbox_inputs"))
 
     async def renew_task_lease(self, task_id: str, worker_id: str, lease_ttl_seconds: int) -> bool:
         rows = await self._patch(
