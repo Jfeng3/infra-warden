@@ -50,9 +50,11 @@ class TaskSandboxInputs:
     client_slug: str
     client_runtime_key: str
     client_runtime_dir: str
+    client_runtime_destination: str
     workflow_config_path: str
     roadmap_path: str
     private_source_file: str = ""
+    private_source_destination: str = ""
 
     @classmethod
     def from_value(cls, value: Any) -> "TaskSandboxInputs | None":
@@ -65,9 +67,11 @@ class TaskSandboxInputs:
             client_slug=value.get("client_slug"),
             client_runtime_key=value.get("client_runtime_key"),
             client_runtime_dir=value.get("client_runtime_dir"),
+            client_runtime_destination=value.get("client_runtime_destination"),
             workflow_config_path=value.get("workflow_config_path"),
             roadmap_path=value.get("roadmap_path"),
             private_source_file=value.get("private_source_file", ""),
+            private_source_destination=value.get("private_source_destination", ""),
         )
 
 

@@ -3,9 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
+import posixpath
 import shlex
 import socket
 from typing import Mapping
+
+from .task_inputs import SANDBOX_CLIENT_RUNTIME_ROOT, SANDBOX_INPUTS_MAPPED_ENV
 
 
 DEFAULT_LEASE_TTL_SECONDS = 10 * 60
@@ -52,6 +55,14 @@ class ControllerConfig:
             value = source_env.get(name)
             if value:
                 env[name] = value
+        if self.runtime == "e2b" and self.command_cwd:
+            env[SANDBOX_INPUTS_MAPPED_ENV] = "1"
+            env["WARDEN_CLIENT_RUNTIME_ROOT"] = posixpath.join(
+                self.command_cwd,
+                SANDBOX_CLIENT_RUNTIME_ROOT,
+            )
+        elif self.client_runtime_root:
+            env["WARDEN_CLIENT_RUNTIME_ROOT"] = self.client_runtime_root
         return env
 
 

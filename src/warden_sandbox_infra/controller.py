@@ -57,6 +57,7 @@ class SandboxController:
                 sandbox_inputs,
                 client_runtime_root=self.config.client_runtime_root,
                 private_source_roots=self.config.private_source_roots,
+                sandbox_repo_root=self.config.command_cwd,
             )
             async with LeaseKeeper(
                 store=self.store,

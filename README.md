@@ -74,6 +74,10 @@ After a task is claimed, the controller reads only
 `WARDEN_CLIENT_RUNTIME_ROOT`, uploads that one directory, and uploads only the
 selected local private source beneath `WARDEN_PRIVATE_SOURCE_ROOTS`. Files are
 mode `600`; symlinks and paths outside the allowlists fail before E2B starts.
+The client package is mapped beneath
+`$WARDEN_WORKER_CWD/.warden-inputs/clients/<client>` and the selected private
+file beneath `$WARDEN_WORKER_CWD/.warden-inputs/private/<client>/`; the worker
+receives those sandbox paths, never the Mac host runtime root.
 The defaults are sibling `project-delivery/runtime-config`,
 `project-delivery/private-inputs`, and `domain-niche`. Separate multiple private
 roots with the host path separator.

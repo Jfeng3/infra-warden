@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+import tempfile
 import unittest
 
 from warden_sandbox_infra.config import load_config
@@ -89,6 +91,50 @@ class ConfigTests(unittest.TestCase):
             config.forwarded_env_names,
             ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "POSTHOG_API_KEY"),
         )
+
+    def test_e2b_worker_env_uses_mapped_sandbox_runtime_root(self) -> None:
+        with tempfile.TemporaryDirectory() as runtime_root:
+            config = load_config(
+                {
+                    "SUPABASE_URL": "https://example.supabase.co",
+                    "SUPABASE_SERVICE_ROLE_KEY": "secret",
+                    "WARDEN_WORKER_COMMAND": "warden worker-task",
+                    "WARDEN_SANDBOX_RUNTIME": "e2b",
+                    "WARDEN_SANDBOX_ENV": "POSTHOG_API_KEY",
+                    "WARDEN_CLIENT_RUNTIME_ROOT": runtime_root,
+                    "WARDEN_WORKER_CWD": "/workspace/warden",
+                    "WARDEN_VERCEL_AUTH_PATH": "",
+                    "WARDEN_VERCEL_PROJECT_PATH": "",
+                }
+            )
+
+            env = config.worker_env(
+                "task-1",
+                {"POSTHOG_API_KEY": "posthog-secret"},
+            )
+
+        self.assertEqual(
+            env["WARDEN_CLIENT_RUNTIME_ROOT"],
+            "/workspace/warden/.warden-inputs/clients",
+        )
+        self.assertEqual(env["WARDEN_SANDBOX_INPUTS_MAPPED"], "1")
+
+    def test_local_worker_env_keeps_host_runtime_root(self) -> None:
+        with tempfile.TemporaryDirectory() as runtime_root:
+            config = load_config(
+                {
+                    "SUPABASE_URL": "https://example.supabase.co",
+                    "SUPABASE_SERVICE_ROLE_KEY": "secret",
+                    "WARDEN_WORKER_COMMAND": "warden worker-task",
+                    "WARDEN_SANDBOX_RUNTIME": "local",
+                    "WARDEN_CLIENT_RUNTIME_ROOT": runtime_root,
+                }
+            )
+
+            env = config.worker_env("task-1", {})
+
+        self.assertEqual(env["WARDEN_CLIENT_RUNTIME_ROOT"], str(Path(runtime_root).resolve()))
+        self.assertNotIn("WARDEN_SANDBOX_INPUTS_MAPPED", env)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from warden_sandbox_infra.models import TASK_LEASE_SELECT, TASK_SANDBOX_INPUTS_SELECT, TaskLease
+from warden_sandbox_infra.models import (
+    TASK_LEASE_SELECT,
+    TASK_SANDBOX_INPUTS_SELECT,
+    TaskLease,
+    TaskSandboxInputs,
+)
 from warden_sandbox_infra.supabase_store import SupabaseTaskStore
 
 
@@ -45,6 +50,27 @@ class TaskContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(hasattr(task, "instruction"))
         self.assertFalse(hasattr(task, "metadata"))
         self.assertFalse(hasattr(task, "workflow_progress"))
+
+    def test_parses_warden_schema_v2_sandbox_destinations(self) -> None:
+        inputs = TaskSandboxInputs.from_value(
+            {
+                "schema_version": 2,
+                "client_slug": "inkwarden",
+                "client_runtime_key": "inkwarden",
+                "client_runtime_dir": "/host/runtime-config/inkwarden",
+                "client_runtime_destination": ".warden-inputs/clients/inkwarden",
+                "workflow_config_path": "/host/runtime-config/inkwarden/workflow.json",
+                "roadmap_path": "/host/runtime-config/inkwarden/assets/roadmap.json",
+                "private_source_file": "/host/private-inputs/inkwarden/source.txt",
+                "private_source_destination": ".warden-inputs/private/inkwarden/source.txt",
+            }
+        )
+
+        self.assertIsNotNone(inputs)
+        assert inputs is not None
+        self.assertEqual(inputs.schema_version, 2)
+        self.assertEqual(inputs.client_runtime_destination, ".warden-inputs/clients/inkwarden")
+        self.assertEqual(inputs.private_source_destination, ".warden-inputs/private/inkwarden/source.txt")
 
     async def test_reads_only_the_sandbox_input_projection_after_claim(self) -> None:
         store = RecordingSupabaseTaskStore("https://example.supabase.co", "secret")

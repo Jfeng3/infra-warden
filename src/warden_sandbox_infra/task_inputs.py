@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 
 from .models import SandboxUpload, SandboxUploadBundle, TaskSandboxInputs
 
 
 _SAFE_CLIENT_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+SANDBOX_INPUTS_MAPPED_ENV = "WARDEN_SANDBOX_INPUTS_MAPPED"
+SANDBOX_CLIENT_RUNTIME_ROOT = ".warden-inputs/clients"
+SANDBOX_PRIVATE_INPUT_ROOT = ".warden-inputs/private"
 
 
 def prepare_sandbox_uploads(
@@ -14,10 +17,11 @@ def prepare_sandbox_uploads(
     *,
     client_runtime_root: str | None,
     private_source_roots: tuple[str, ...],
+    sandbox_repo_root: str | None,
 ) -> SandboxUploadBundle | None:
     if inputs is None:
         return None
-    if type(inputs.schema_version) is not int or inputs.schema_version != 1:
+    if type(inputs.schema_version) is not int or inputs.schema_version != 2:
         raise ValueError(f"unsupported sandbox_inputs schema_version: {inputs.schema_version}")
     if not isinstance(inputs.client_slug, str) or not _SAFE_CLIENT_SLUG.fullmatch(inputs.client_slug):
         raise ValueError("sandbox_inputs client_slug must be safe kebab-case")
@@ -25,6 +29,14 @@ def prepare_sandbox_uploads(
         raise ValueError("sandbox_inputs client_runtime_key must be safe kebab-case")
     if not client_runtime_root:
         raise ValueError("WARDEN_CLIENT_RUNTIME_ROOT is required for client task inputs")
+    sandbox_root = _sandbox_root(sandbox_repo_root)
+
+    expected_client_destination = f"{SANDBOX_CLIENT_RUNTIME_ROOT}/{inputs.client_runtime_key}"
+    if inputs.client_runtime_destination != expected_client_destination:
+        raise ValueError(
+            f"sandbox_inputs client_runtime_destination must be {expected_client_destination}"
+        )
+    client_destination = _sandbox_destination(sandbox_root, expected_client_destination)
 
     runtime_root = _existing_directory(client_runtime_root, "client runtime root")
     client_dir = _existing_directory(inputs.client_runtime_dir, "client runtime directory")
@@ -44,7 +56,8 @@ def prepare_sandbox_uploads(
         if file_path.is_symlink():
             raise ValueError(f"client runtime package must not contain symlinks: {file_path}")
         if file_path.is_file():
-            uploads.append(_upload(file_path))
+            relative = file_path.relative_to(client_dir)
+            uploads.append(_upload(file_path, client_destination.joinpath(*relative.parts)))
 
     if inputs.private_source_file:
         private_file = _existing_file(inputs.private_source_file, "private source file")
@@ -55,7 +68,23 @@ def prepare_sandbox_uploads(
         allowed_roots = [_existing_directory(root, "private source root") for root in private_source_roots]
         if not any(_inside(private_file, root) for root in allowed_roots):
             raise ValueError("private source file is outside WARDEN_PRIVATE_SOURCE_ROOTS")
-        uploads.append(_upload(private_file))
+        expected_private_destination = (
+            f"{SANDBOX_PRIVATE_INPUT_ROOT}/{inputs.client_slug}/{private_file.name}"
+        )
+        if inputs.private_source_destination != expected_private_destination:
+            raise ValueError(
+                f"sandbox_inputs private_source_destination must be {expected_private_destination}"
+            )
+        uploads.append(
+            _upload(
+                private_file,
+                _sandbox_destination(sandbox_root, expected_private_destination),
+            )
+        )
+    elif inputs.private_source_destination:
+        raise ValueError(
+            "sandbox_inputs private_source_destination must be empty without private_source_file"
+        )
 
     return SandboxUploadBundle(tuple(uploads))
 
@@ -93,6 +122,27 @@ def _inside(candidate: Path, root: Path) -> bool:
     return True
 
 
-def _upload(path: Path) -> SandboxUpload:
-    absolute = str(path.resolve())
-    return SandboxUpload(source_path=absolute, destination_path=absolute, mode=0o600)
+def _sandbox_root(value: str | None) -> PurePosixPath:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("WARDEN_WORKER_CWD is required for mapped client task inputs")
+    root = PurePosixPath(value)
+    if not root.is_absolute():
+        raise ValueError("WARDEN_WORKER_CWD must be an absolute sandbox path")
+    if ".." in root.parts:
+        raise ValueError("WARDEN_WORKER_CWD must not contain parent traversal")
+    return root
+
+
+def _sandbox_destination(root: PurePosixPath, relative: str) -> PurePosixPath:
+    candidate = PurePosixPath(relative)
+    if candidate.is_absolute() or ".." in candidate.parts:
+        raise ValueError("sandbox input destination must stay inside WARDEN_WORKER_CWD")
+    return root.joinpath(candidate)
+
+
+def _upload(path: Path, destination: PurePosixPath) -> SandboxUpload:
+    return SandboxUpload(
+        source_path=str(path.resolve()),
+        destination_path=str(destination),
+        mode=0o600,
+    )
