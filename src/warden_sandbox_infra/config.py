@@ -20,7 +20,7 @@ DEFAULT_VERCEL_PROJECT_PATH = INFRA_ROOT.parent / "warden" / ".vercel" / "projec
 DEFAULT_CLIENT_RUNTIME_ROOT = INFRA_ROOT.parent / "project-delivery" / "runtime-config"
 DEFAULT_PRIVATE_SOURCE_ROOTS = (
     INFRA_ROOT.parent / "project-delivery" / "private-inputs",
-    INFRA_ROOT.parent / "domain-niche",
+    INFRA_ROOT.parent / "domain_niche",
 )
 
 

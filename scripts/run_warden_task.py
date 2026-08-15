@@ -110,7 +110,7 @@ def build_controller_env(
         os.pathsep.join(
             (
                 str(DEFAULT_PROJECT_DELIVERY_REPO / "private-inputs"),
-                str(REPO_ROOT.parent / "domain-niche"),
+                str(REPO_ROOT.parent / "domain_niche"),
             )
         ),
     )

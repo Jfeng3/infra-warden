@@ -79,7 +79,7 @@ The client package is mapped beneath
 file beneath `$WARDEN_WORKER_CWD/.warden-inputs/private/<client>/`; the worker
 receives those sandbox paths, never the Mac host runtime root.
 The defaults are sibling `project-delivery/runtime-config`,
-`project-delivery/private-inputs`, and `domain-niche`. Separate multiple private
+`project-delivery/private-inputs`, and `domain_niche`. Separate multiple private
 roots with the host path separator.
 
 ## Claimed Task Contract
