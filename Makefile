@@ -1,4 +1,4 @@
-BUYING_GUIDE_E2B_TEMPLATE ?= 2026-08-12-buying-guide-pipeline-code-only
+BUYING_GUIDE_E2B_TEMPLATE ?= 2026-08-18-buying-guide-no-posthog
 
 .PHONY: check test lint build-e2b-template build-buying-guide-e2b-template smoke-e2b run-task
 

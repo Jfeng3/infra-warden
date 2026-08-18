@@ -66,7 +66,7 @@ build. It never accepts or packages a client config, roadmap, or private source:
 E2B_API_KEY=<key> make build-buying-guide-e2b-template
 ```
 
-The target defaults to `2026-08-12-buying-guide-pipeline-code-only`. Override
+The target defaults to `2026-08-18-buying-guide-no-posthog`. Override
 `BUYING_GUIDE_E2B_TEMPLATE` when creating a later dated code image.
 
 After a task is claimed, the controller reads only
