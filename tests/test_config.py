@@ -83,13 +83,13 @@ class ConfigTests(unittest.TestCase):
                 "SUPABASE_SERVICE_ROLE_KEY": "secret",
                 "WARDEN_WORKER_COMMAND": "warden worker-task",
                 "WARDEN_SANDBOX_RUNTIME": "e2b",
-                "WARDEN_SANDBOX_ENV": "POSTHOG_API_KEY",
+                "WARDEN_SANDBOX_ENV": "OPENROUTER_API_KEY",
             }
         )
 
         self.assertEqual(
             config.forwarded_env_names,
-            ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "POSTHOG_API_KEY"),
+            ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "OPENROUTER_API_KEY"),
         )
 
     def test_e2b_worker_env_uses_mapped_sandbox_runtime_root(self) -> None:
@@ -100,7 +100,7 @@ class ConfigTests(unittest.TestCase):
                     "SUPABASE_SERVICE_ROLE_KEY": "secret",
                     "WARDEN_WORKER_COMMAND": "warden worker-task",
                     "WARDEN_SANDBOX_RUNTIME": "e2b",
-                    "WARDEN_SANDBOX_ENV": "POSTHOG_API_KEY",
+                    "WARDEN_SANDBOX_ENV": "OPENROUTER_API_KEY",
                     "WARDEN_CLIENT_RUNTIME_ROOT": runtime_root,
                     "WARDEN_WORKER_CWD": "/workspace/warden",
                     "WARDEN_VERCEL_AUTH_PATH": "",
@@ -110,7 +110,7 @@ class ConfigTests(unittest.TestCase):
 
             env = config.worker_env(
                 "task-1",
-                {"POSTHOG_API_KEY": "posthog-secret"},
+                {"OPENROUTER_API_KEY": "openrouter-secret"},
             )
 
         self.assertEqual(

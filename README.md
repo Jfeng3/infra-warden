@@ -98,7 +98,7 @@ make run-task TASK_ID=<task-id>
 
 The launcher reads controller settings from this repo's `.env`, reads only the
 reviewed Warden runtime variables from `../warden/.env`, and sets the canonical
-`WARDEN_SANDBOX_ENV` list. It validates Supabase, E2B, PostHog, and the selected
+`WARDEN_SANDBOX_ENV` list. It validates Supabase, E2B, and the selected
 LLM provider before paying to create a sandbox. It also replaces any inherited
 `WARDEN_WORKER_COMMAND` with the canonical command, preventing nested shell
 quotes from reaching E2B. It never prints secret values.

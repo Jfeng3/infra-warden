@@ -23,8 +23,6 @@ WARDEN_RUNTIME_ENV = (
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
     "OPENROUTER_API_KEY",
-    "POSTHOG_API_KEY",
-    "POSTHOG_HOST",
     "TELEGRAM_BOT_TOKEN",
     "WP_SSH",
     "TWITTER_CONSUMER_KEY",
@@ -153,7 +151,7 @@ def _fill_missing(destination: dict[str, str], source: dict[str, str]) -> None:
 
 
 def _validate(env: dict[str, str]) -> None:
-    required = ["E2B_API_KEY", "E2B_TEMPLATE", "SUPABASE_URL", "POSTHOG_API_KEY", "POSTHOG_HOST"]
+    required = ["E2B_API_KEY", "E2B_TEMPLATE", "SUPABASE_URL"]
     if not (env.get("SUPABASE_SERVICE_ROLE_KEY") or env.get("SUPABASE_ANON_KEY")):
         required.append("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY")
 

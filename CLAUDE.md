@@ -208,7 +208,7 @@ make run-task TASK_ID=<task-id>
 Do not assemble an ad hoc `WARDEN_SANDBOX_ENV` list or retry a task once per
 missing variable. `scripts/run_warden_task.py` loads controller settings from
 this repo's `.env`, loads only its reviewed Warden runtime whitelist from
-`../warden/.env`, and validates required E2B, Supabase, PostHog, and provider
+`../warden/.env`, and validates required E2B, Supabase, and provider
 settings before creating the sandbox. It always replaces inherited
 `WARDEN_WORKER_COMMAND` with its canonical command; never wrap that complete
 command in another quote layer. If a startup failure has already marked a task

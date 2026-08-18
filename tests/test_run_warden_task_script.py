@@ -27,26 +27,22 @@ class RunWardenTaskScriptTests(unittest.TestCase):
             )
             warden_env.write_text(
                 "SUPABASE_SERVICE_ROLE_KEY=service-secret\n"
-                "POSTHOG_API_KEY=posthog-secret\n"
-                "POSTHOG_HOST=https://posthog.example\n"
                 "DATAFORSEO_LOGIN=data-login\n"
                 "STRIPE_SECRET_KEY=must-not-cross-boundary\n"
             )
 
             env = run_warden_task.build_controller_env(
                 {
-                    "WARDEN_SANDBOX_ENV": "POSTHOG_API_KEY",
+                    "WARDEN_SANDBOX_ENV": "STRIPE_SECRET_KEY",
                     "WARDEN_WORKER_COMMAND": "npm run warden -- worker-task --task-id '$WARDEN_TASK_ID",
                 },
                 infra_env,
                 warden_env,
             )
 
-        self.assertEqual(env["POSTHOG_API_KEY"], "posthog-secret")
         self.assertEqual(env["DATAFORSEO_LOGIN"], "data-login")
         self.assertEqual(env["SUPABASE_SERVICE_ROLE_KEY"], "service-secret")
         self.assertNotIn("STRIPE_SECRET_KEY", env)
-        self.assertIn("POSTHOG_API_KEY", env["WARDEN_SANDBOX_ENV"].split(","))
         self.assertIn("DATAFORSEO_LOGIN", env["WARDEN_SANDBOX_ENV"].split(","))
         self.assertEqual(env["WARDEN_SANDBOX_RUNTIME"], "e2b")
         self.assertEqual(env["WARDEN_WORKER_COMMAND"], run_warden_task.CANONICAL_WORKER_COMMAND)
@@ -57,7 +53,7 @@ class RunWardenTaskScriptTests(unittest.TestCase):
             infra_env = root / "infra.env"
             warden_env = root / "warden.env"
             infra_env.write_text("E2B_API_KEY=file-value\n")
-            warden_env.write_text("POSTHOG_API_KEY=file-value\n")
+            warden_env.write_text("DATAFORSEO_LOGIN=file-value\n")
 
             env = run_warden_task.build_controller_env(
                 {"E2B_API_KEY": "host-value"},
