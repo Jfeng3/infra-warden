@@ -129,6 +129,25 @@ class E2BRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.error, "command connection failed")
         self.assertTrue(FakeAsyncSandbox.sandbox.killed)
 
+    async def test_empty_command_exception_retains_sandbox_context(self) -> None:
+        FakeAsyncSandbox.sandbox = FakeSandbox(RuntimeError())
+        runtime = E2BSandboxRuntime(template="warden:v1", sandbox_timeout_seconds=600)
+
+        with patch.dict(sys.modules, {"e2b": SimpleNamespace(AsyncSandbox=FakeAsyncSandbox)}):
+            result = await runtime.run_task(
+                command="false",
+                env={},
+                cwd=None,
+                timeout_seconds=60,
+                task_id="task-1",
+                worker_id="worker-1",
+            )
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertEqual(result.error, "")
+        self.assertEqual(result.sandbox_id, "sandbox-123")
+        self.assertTrue(FakeAsyncSandbox.sandbox.killed)
+
     async def test_uploads_codex_auth_with_private_permissions(self) -> None:
         auth = b'{"tokens":{"access_token":"access","refresh_token":"refresh"}}'
         runtime = E2BSandboxRuntime(

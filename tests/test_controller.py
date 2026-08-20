@@ -164,6 +164,43 @@ class ControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("worker command exited with code 2", store.failed[0][1])
         self.assertIn("bad", store.failed[0][1])
 
+    async def test_run_once_falls_back_to_sandbox_id_and_exit_code_for_empty_e2b_error(self) -> None:
+        store = FakeStore(TaskLease(id="task-1", status="pending"))
+        runtime = FakeRuntime(
+            SandboxRunResult(
+                exit_code=17,
+                error=" \n",
+                stderr="\t",
+                sandbox_id="sandbox-123",
+            )
+        )
+        controller = SandboxController(config(), store, runtime)
+
+        result = await controller.run_once()
+
+        expected = "E2B sandbox sandbox-123: worker command exited with code 17"
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.message, expected)
+        self.assertEqual(store.failed, [("task-1", expected, "worker-1")])
+
+    async def test_run_once_preserves_nonempty_error_and_appends_trimmed_stderr(self) -> None:
+        store = FakeStore(TaskLease(id="task-1", status="pending"))
+        runtime = FakeRuntime(
+            SandboxRunResult(
+                exit_code=17,
+                error=" command connection failed ",
+                stderr=" worker crashed \n",
+                sandbox_id="sandbox-123",
+            )
+        )
+        controller = SandboxController(config(), store, runtime)
+
+        result = await controller.run_once()
+
+        expected = "command connection failed\nworker crashed"
+        self.assertEqual(result.message, expected)
+        self.assertEqual(store.failed, [("task-1", expected, "worker-1")])
+
     async def test_run_once_returns_idle_when_no_task(self) -> None:
         store = FakeStore(None)
         runtime = FakeRuntime(SandboxRunResult(exit_code=0))

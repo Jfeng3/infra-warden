@@ -85,9 +85,7 @@ class SandboxController:
             await self.store.complete_task(task.id, _result_text(result), self.config.worker_id)
             return RunOnceResult(status="completed", task_id=task.id)
 
-        message = result.error or f"worker command exited with code {result.exit_code}"
-        if result.stderr:
-            message = f"{message}\n{result.stderr.strip()}"
+        message = _failure_text(result)
         await self.store.fail_task(task.id, message, self.config.worker_id)
         return RunOnceResult(status="failed", task_id=task.id, message=message)
 
@@ -131,3 +129,16 @@ def _result_text(result: SandboxRunResult) -> str:
     if result.stderr.strip():
         text = f"{text}\n\nSTDERR:\n{result.stderr.strip()}".strip()
     return text or "(worker completed with no output)"
+
+
+def _failure_text(result: SandboxRunResult) -> str:
+    error = (result.error or "").strip()
+    stderr = result.stderr.strip()
+    if error:
+        text = error
+    else:
+        sandbox = f"E2B sandbox {result.sandbox_id}: " if result.sandbox_id else ""
+        text = f"{sandbox}worker command exited with code {result.exit_code}"
+    if stderr:
+        text = f"{text}\n{stderr}"
+    return text
