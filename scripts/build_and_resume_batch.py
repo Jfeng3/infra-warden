@@ -310,7 +310,9 @@ def short_slug(value: str) -> str:
 
 
 def build_template(name: str, repo: Path, *, no_cache: bool) -> None:
-    env = os.environ.copy()
+    env = build_controller_env(os.environ, REPO_ROOT / ".env", repo / ".env")
+    if not env.get("E2B_API_KEY", "").strip():
+        raise SystemExit("E2B_API_KEY is required to build the E2B template")
     env["E2B_TEMPLATE"] = name
     env["WARDEN_REPO_PATH"] = str(repo)
     # The Makefile invokes ``python3`` directly; force the infra venv so the

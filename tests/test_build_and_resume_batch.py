@@ -21,6 +21,46 @@ TASK_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 
 
 class BuildAndResumeBatchTests(unittest.TestCase):
+    def test_template_build_uses_resolved_controller_environment(self) -> None:
+        resolved = {
+            "E2B_API_KEY": "e2b-from-env-file",
+            "PATH": "/usr/bin",
+        }
+        with patch.object(
+            build_and_resume_batch,
+            "build_controller_env",
+            return_value=resolved,
+        ) as build_env, patch.object(build_and_resume_batch.subprocess, "run") as run:
+            build_and_resume_batch.build_template(
+                "template-v2",
+                Path("/tmp/warden"),
+                no_cache=False,
+            )
+
+        build_env.assert_called_once_with(
+            build_and_resume_batch.os.environ,
+            build_and_resume_batch.REPO_ROOT / ".env",
+            Path("/tmp/warden/.env"),
+        )
+        env = run.call_args.kwargs["env"]
+        self.assertEqual(env["E2B_API_KEY"], "e2b-from-env-file")
+        self.assertEqual(env["E2B_TEMPLATE"], "template-v2")
+        self.assertEqual(env["WARDEN_REPO_PATH"], "/tmp/warden")
+
+    def test_template_build_fails_before_make_without_e2b_key(self) -> None:
+        with patch.object(
+            build_and_resume_batch,
+            "build_controller_env",
+            return_value={"PATH": "/usr/bin"},
+        ), patch.object(build_and_resume_batch.subprocess, "run") as run:
+            with self.assertRaisesRegex(SystemExit, "E2B_API_KEY is required"):
+                build_and_resume_batch.build_template(
+                    "template-v2",
+                    Path("/tmp/warden"),
+                    no_cache=False,
+                )
+        run.assert_not_called()
+
     def test_pacific_timestamp_uses_california_timezone_and_dst(self) -> None:
         timestamp = build_and_resume_batch.pacific_timestamp(
             datetime(2026, 8, 26, 3, 0, tzinfo=timezone.utc)
