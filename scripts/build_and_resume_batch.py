@@ -60,6 +60,11 @@ ARTIFACT_STATE_KEYS = (
 UUID_PATTERN = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", re.I)
 LINEAR_ISSUE_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*-\d+$")
 PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
+OPERATOR_PROCESS_ENV = (
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "LINEAR_API_KEY",
+)
 
 
 def pacific_timestamp(now: datetime | None = None) -> str:
@@ -67,6 +72,15 @@ def pacific_timestamp(now: datetime | None = None) -> str:
     return (now or datetime.now(timezone.utc)).astimezone(PACIFIC_TZ).strftime(
         "%Y-%m-%d %H:%M:%S %Z (UTC%z)"
     )
+
+
+def configure_operator_process_env(warden_repo: Path) -> None:
+    """Load credentials used directly by this batch operator from reviewed env files."""
+    resolved = build_controller_env(os.environ, REPO_ROOT / ".env", warden_repo / ".env")
+    for name in OPERATOR_PROCESS_ENV:
+        value = resolved.get(name, "").strip()
+        if value:
+            os.environ[name] = value
 
 
 @dataclass(frozen=True)
@@ -148,6 +162,7 @@ def main() -> int:
     if args.existing_linear_batch_issue and not UUID_PATTERN.fullmatch(args.existing_linear_batch_issue):
         parser.error("--existing-linear-batch-issue must be a Linear issue UUID")
     source_repo = args.warden_repo.resolve()
+    configure_operator_process_env(source_repo)
     branch, current_commit = git_identity(source_repo)
     commit = args.template_commit or current_commit
     if not re.fullmatch(r"[0-9a-f]{40}", commit, re.I):

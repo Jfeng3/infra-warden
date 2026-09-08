@@ -21,6 +21,35 @@ TASK_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 
 
 class BuildAndResumeBatchTests(unittest.TestCase):
+    def test_operator_credentials_are_loaded_from_reviewed_env_files(self) -> None:
+        with patch.dict(build_and_resume_batch.os.environ, {}, clear=True), patch.object(
+            build_and_resume_batch,
+            "build_controller_env",
+            return_value={
+                "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_SERVICE_ROLE_KEY": "service-secret",
+                "LINEAR_API_KEY": "linear-secret",
+                "E2B_API_KEY": "not-a-process-consumer",
+            },
+        ) as build_env:
+            build_and_resume_batch.configure_operator_process_env(Path("/tmp/warden"))
+            self.assertEqual(
+                build_and_resume_batch.os.environ["SUPABASE_URL"],
+                "https://example.supabase.co",
+            )
+            self.assertEqual(
+                build_and_resume_batch.os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+                "service-secret",
+            )
+            self.assertEqual(build_and_resume_batch.os.environ["LINEAR_API_KEY"], "linear-secret")
+            self.assertNotIn("E2B_API_KEY", build_and_resume_batch.os.environ)
+
+        build_env.assert_called_once_with(
+            build_and_resume_batch.os.environ,
+            build_and_resume_batch.REPO_ROOT / ".env",
+            Path("/tmp/warden/.env"),
+        )
+
     def test_template_build_uses_resolved_controller_environment(self) -> None:
         resolved = {
             "E2B_API_KEY": "e2b-from-env-file",
