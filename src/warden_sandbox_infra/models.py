@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 
@@ -55,6 +55,8 @@ class TaskSandboxInputs:
     roadmap_path: str
     private_source_file: str = ""
     private_source_destination: str = ""
+    private_evidence_files: tuple[str, ...] = ()
+    private_evidence_hashes: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_value(cls, value: Any) -> "TaskSandboxInputs | None":
@@ -62,7 +64,15 @@ class TaskSandboxInputs:
             return None
         if not isinstance(value, dict):
             raise ValueError("task metadata.sandbox_inputs must be an object")
+        evidence_files = value.get("private_evidence_files", [])
+        if not isinstance(evidence_files, list) or len(evidence_files) > 256 or any(not isinstance(item, str) for item in evidence_files):
+            raise ValueError("private_evidence_files must be a list of at most 256 paths")
+        evidence_hashes = value.get("private_evidence_hashes", {})
+        if not isinstance(evidence_hashes, dict):
+            raise ValueError("private_evidence_hashes must be an object")
         return cls(
+            private_evidence_hashes=evidence_hashes,
+            private_evidence_files=tuple(evidence_files),
             schema_version=value.get("schema_version"),
             client_slug=value.get("client_slug"),
             client_runtime_key=value.get("client_runtime_key"),

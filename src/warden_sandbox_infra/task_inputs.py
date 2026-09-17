@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path, PurePosixPath
 import re
+import hashlib
 
 from .models import SandboxUpload, SandboxUploadBundle, TaskSandboxInputs
 
@@ -10,6 +11,8 @@ _SAFE_CLIENT_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SANDBOX_INPUTS_MAPPED_ENV = "WARDEN_SANDBOX_INPUTS_MAPPED"
 SANDBOX_CLIENT_RUNTIME_ROOT = ".warden-inputs/clients"
 SANDBOX_PRIVATE_INPUT_ROOT = ".warden-inputs/private"
+MAX_DECLARED_INPUT_FILE_BYTES = 10 * 1024 * 1024
+MAX_DECLARED_INPUT_TOTAL_BYTES = 50 * 1024 * 1024
 
 
 def prepare_sandbox_uploads(
@@ -86,6 +89,32 @@ def prepare_sandbox_uploads(
             "sandbox_inputs private_source_destination must be empty without private_source_file"
         )
 
+    if len(inputs.private_evidence_files) > 256:
+        raise ValueError("private_evidence_files exceeds maximum count of 256")
+    allowed_roots = [_existing_directory(root, "private source root") for root in private_source_roots] if inputs.private_evidence_files else []
+    evidence_bytes = 0
+    for value in inputs.private_evidence_files:
+        source = _existing_file(value, "private evidence file")
+        allowed_root = next((root / inputs.client_slug for root in allowed_roots
+                             if _inside(source, root / inputs.client_slug)), None)
+        if allowed_root is None or _inside(source, client_dir):
+            raise ValueError("private evidence file is outside the selected client's private source root")
+        _reject_symlink_components(source, allowed_root.parent)
+        if source.suffix.lower() not in {".md", ".txt"}:
+            raise ValueError("private evidence file must be Markdown or text")
+        evidence_bytes += source.stat().st_size
+        if source.stat().st_size > MAX_DECLARED_INPUT_FILE_BYTES or evidence_bytes > MAX_DECLARED_INPUT_TOTAL_BYTES:
+            raise ValueError("private evidence files exceed upload size limits")
+        expected_hash = inputs.private_evidence_hashes.get(value)
+        if not isinstance(expected_hash, str) or not re.fullmatch(r"[a-f0-9]{64}", expected_hash):
+            raise ValueError("private evidence hash is missing or invalid")
+        if hashlib.sha256(source.read_bytes()).hexdigest() != expected_hash:
+            raise ValueError("private evidence hash mismatch")
+        destination = _sandbox_destination(sandbox_root, f"{SANDBOX_PRIVATE_INPUT_ROOT}/{inputs.client_slug}/{source.name}")
+        if any(item.destination_path == str(destination) for item in uploads):
+            raise ValueError("duplicate private evidence destination")
+        uploads.append(_upload(source, destination))
+
     return SandboxUploadBundle(tuple(uploads))
 
 
@@ -120,6 +149,15 @@ def _inside(candidate: Path, root: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _reject_symlink_components(candidate: Path, root: Path) -> None:
+    relative = candidate.relative_to(root)
+    current = root
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError(f"declared file source_path must not contain symlinks: {candidate}")
 
 
 def _sandbox_root(value: str | None) -> PurePosixPath:

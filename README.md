@@ -159,3 +159,28 @@ baked into the E2B template or added to the task environment.
 
 Use `WARDEN_SANDBOX_RUNTIME=local` for local command execution during
 development.
+
+### Post-selected private document retrieval files (v2)
+
+Roadmap posts select `private_document_ids`. Warden resolves IDs through the
+client's private `document-registry.json`, hashes the selected Markdown/text
+files, and puts their absolute paths and SHA-256 values in
+`sandbox_inputs.private_evidence_files` and `private_evidence_hashes`.
+
+Infra uploads only those files alongside the primary private source, into
+`.warden-inputs/private/<client_slug>/`. It checks hashes before upload; Warden
+checks them again before building its full-text index. Resolved metadata in
+selected-post state is remapped to the uploaded paths. No fixed page selection:
+Step 23 searches these full documents independently alongside web search;
+Step 30 merges exact retrieved excerpts into the candidate proof ledger.
+
+The list is optional (older v2 tasks with no private corpus still work), limited
+to 256 files, 10 MiB each and 50 MiB total. Files must remain under the selected
+client's configured private root. Symlinks, duplicate sandbox basenames,
+cross-client paths and changed/missing hashes are rejected. Registry files and
+unselected documents never enter the upload bundle or reusable template.
+
+Existing queued tasks do not acquire new manifest entries automatically.
+Before launch, apply Warden migration `097_private_document_rag.sql`, build an
+E2B template containing the updated Warden code, and run the updated controller.
+Deployment and live task execution remain explicit operator actions.

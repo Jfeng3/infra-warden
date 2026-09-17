@@ -4,10 +4,13 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from warden_sandbox_infra.config import load_config
+from warden_sandbox_infra.config import DEFAULT_PRIVATE_SOURCE_ROOTS, load_config
 
 
 class ConfigTests(unittest.TestCase):
+    def test_default_domain_research_root_uses_repository_spelling(self) -> None:
+        self.assertEqual(DEFAULT_PRIVATE_SOURCE_ROOTS[-1].name, "domain-niche")
+
     def test_rejects_unbalanced_worker_command_quotes_before_runtime(self) -> None:
         with self.assertRaisesRegex(ValueError, "WARDEN_WORKER_COMMAND has invalid shell quoting"):
             load_config(
